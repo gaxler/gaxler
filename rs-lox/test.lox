@@ -1,0 +1,12 @@
+fun helper(y) {
+    var z = y*2;
+    return z;
+}
+// this is a comment
+
+fun main        (argv) {
+    var j = 0;
+    var p = "hello";
+    var dj = helper(j);
+
+}
