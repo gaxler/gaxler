@@ -1,12 +1,10 @@
-use std::cell::RefCell;
+use std::{cell::RefCell};
 
-use crate::opcode::{Chunk, OpCode, Value};
+use crate::{opcode::{Chunk, OpCode, Value}, errors::{RTError, RuntimeError}};
 
-use thiserror::Error;
 
 const STACK_MAX: usize = 256;
 
-type RTError<T> = Result<T, RuntimeError>;
 
 pub fn disassemble_op(chunk: &Chunk, offset: usize) {
     use OpCode::*;
@@ -19,29 +17,17 @@ pub fn disassemble_op(chunk: &Chunk, offset: usize) {
         print!(" {:04} ", &line)
     }
     match op {
-        RETURN => println!("OP_RETURN"),
+        RETURN => println!("OP: RETURN"),
         CONSTANT(idx) => {
             let const_val = chunk.consts[*idx as usize];
-            println!("OP_CONSTANT ({})", const_val)
+            println!("OP: CONSTANT ({})", const_val)
         },
-        t => println!("OP: {:?}", t)
+        t => {
+            println!("OP: {:?}", t); 
+        }
     }
 }
 
-
-
-#[derive(Debug, Error)]
-pub enum RuntimeError {
-    #[error("Stack: {0}")]
-    StackError(String)
-    
-}
-
-pub enum InterpResult {
-    Ok,
-    CompileError,
-    RuntimeError,
-}
 
 pub struct Stack {
     stack: [Value; STACK_MAX],
@@ -51,14 +37,13 @@ pub struct Stack {
 impl Stack {
     fn init() -> Self {
         Self {
-            stack: [Value::Null; STACK_MAX],
+            stack: [Value::Nil; STACK_MAX],
             top: 0,
         }
     }
 
     pub fn push(&mut self, val: Value) -> RTError<()> {
         if self.top > self.stack.len() - 1 {
-            
             return Err(RuntimeError::StackError("Oveflow".to_string()));
         }
 
@@ -69,12 +54,12 @@ impl Stack {
 
     pub fn pop(&mut self) -> RTError<Value> {
         if self.top == 0 {
-            return Err(RuntimeError::StackError("Underflow".to_string()))
+            return Err(RuntimeError::StackError("Underflow".to_string()));
         }
 
         self.top -= 1;
         let pidx = self.top;
-        let out_val = std::mem::replace(&mut self.stack[pidx], Value::Null);
+        let out_val = std::mem::replace(&mut self.stack[pidx], Value::Nil);
         Ok(out_val)
     }
 }
@@ -82,40 +67,67 @@ impl Stack {
 fn exec_unary(op: &OpCode, stack: &mut Stack) -> RTError<()> {
     use OpCode::*;
 
-    match op {
+    let unary_inp = stack.pop()?;
+    
+    let unary_result = match op {
         NEGATE => {
-            let out_val = stack.pop()?;
-
-            let res = match out_val {
+            match unary_inp {
                 Value::Int(v) => Value::Int(-v),
                 Value::Float(v) => Value::Float(-v),
-                Value::Null => Value::Null,
-            };
-            println!("\t negated val {}", res);
-            stack.push(res)?;
+                Value::Nil => Value::Nil,
+                Value::Bool(_) => return Err(RuntimeError::IllegalUnaryOp(*op, unary_inp)),
+            }
+        },
+        // Take a value out of the stack, and negate it. 
+        //  is defined on the value enum that should be 
+
+        NOT => {
+            match unary_inp {
+                Value::Bool(b) => Value::Bool(!b),
+                Value::Nil => Value::Bool(true),
+                _ => return Err(RuntimeError::IllegalUnaryOp(*op, unary_inp))
+                
+            }
         }
         _ => panic!("Not a unary op!!"),
-    }
+    };
+    
+    stack.push(unary_result)?;
+
     Ok(())
 }
 
-
+fn _binary_nil_error(op: OpCode, v1: Value, v2: Value, res: Value) -> RTError<Value> {
+    if let Value::Nil = res {
+        return Err(RuntimeError::IllegalOp(op, v1, v2));
+    }
+    Ok(res)
+}
 
 fn exec_binary(op: &OpCode, stack: &mut Stack) -> Result<(), RuntimeError> {
     use OpCode::*;
 
     let v2 = stack.pop()?;
     let v1 = stack.pop()?;
+    
+
     let res = match op {
-        ADD =>   v1.add(v2),
+        ADD => v1.add(v2),
         SUB => v1.sub(v2),
         MUL => v1.mul(v2),
         DIV => v1.div(v2),
-        _ => panic!("Non Binary!!")
+        EQUAL => v1.eq(v2),
+        GREATER => v1.greater(v2),
+        LESS => v2.greater(v1),
+        _ => panic!("Non Binary!!"),
     };
+
+    if let Value::Nil = res {
+        return Err(RuntimeError::IllegalOp(*op, v1, v2));
+    }
+
     stack.push(res)?;
     Ok(())
-
 }
 
 pub struct VM<'a> {
@@ -167,19 +179,25 @@ impl<'a> VM<'a> {
                 CONSTANT(idx) => {
                     let val = self.chunk.consts[*idx as usize];
                     self.push(val);
-                    self.ip += 1;
                 }
-                NEGATE  => {
+                NEGATE | NOT => {
                     let mut s = self.stack.borrow_mut();
                     exec_unary(op, &mut s).unwrap();
-                    self.ip += 1;
-                },
-                ADD | SUB | MUL | DIV => {
+                }
+                lit @ (NIL | FALSE | TRUE) => {
+                    let val = Value::try_from(*lit);
+                    if val.is_ok() {
+                        self.push(val.unwrap());
+                    }
+                    
+                }
+                
+                ADD | SUB | MUL | DIV | LESS | GREATER | EQUAL => {
                     let mut s = self.stack.borrow_mut();
                     exec_binary(op, &mut s).unwrap();
-                    self.ip += 1;
                 }
             }
+            self.ip += 1;
         }
         if self.debug {
             let top = self.stack.borrow().top;
@@ -187,8 +205,10 @@ impl<'a> VM<'a> {
             print!(" Stack: [ ");
             for (idx, &s) in stack.iter().enumerate() {
                 print!("{:?} ", s);
-                if idx >= top { break;}
-            };
+                if idx >= top {
+                    break;
+                }
+            }
             println!(" ... ]");
         }
         Ok(())

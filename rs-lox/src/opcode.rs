@@ -9,7 +9,11 @@ pub enum OpCode {
     NOT,
     NIL,
     TRUE,
+    
     FALSE,
+    EQUAL,
+    LESS,
+    GREATER,
     ADD,
     SUB,
     MUL,
@@ -61,11 +65,10 @@ impl TryFrom<OpCode> for Value {
 }
 
 
-macro_rules! value_op {
-    ($self:ident->$v1: ident, $other:ident->$v2:ident, $e:expr) => {
+macro_rules! map_expr {
+    ($self:ident->$v1:ident, $other:ident->$v2:ident, $e:expr, ($($val_ty:ident),*)) => {
         match ($self, $other) {
-            (Value::Int($v1), Value::Int($v2)) => Value::Int($e),
-            (Value::Float($v1), Value::Float($v2)) => Value::Float($e),
+            $((Value::$val_ty($v1), Value::$val_ty($v2)) => Value::$val_ty($e),)*
             _ => Value::Nil
         }   
     };
@@ -74,19 +77,45 @@ macro_rules! value_op {
 impl Value {
 
     pub fn add(&self, other: Self) -> Self {
-        value_op!(self->v1, other->v2, v1+v2)
+        map_expr!(self->v1, other->v2, v1+v2, (Int, Float))
+        // value_op!(self->v1, other->v2, v1+v2)
     }
 
     pub fn sub(&self, other: Self) -> Self {
-        value_op!(self->v1, other->v2, v1-v2)
+        map_expr!(self->v1, other->v2, v1-v2, (Int, Float))
     }
 
     pub fn mul(&self, other: Self) -> Self {
-        value_op!(self->v1, other->v2, v1*v2)
+        map_expr!(self->v1, other->v2, v1*v2, (Int, Float))
     } 
     pub fn div(&self, other: Self) -> Self {
-        value_op!(self->v1, other->v2, v1/v2)
+        map_expr!(self->v1, other->v2, v1/v2, (Int, Float))
     } 
+
+    pub fn eq(&self, other: Self) -> Self {
+        use Value::*;
+        let res = match (self, other) {
+            (Int(v1), Int(v2)) => *v1 == v2,
+            (Float(v1), Float(v2)) => *v1 == v2,
+            (Bool(b1), Bool(b2)) => !((*b1)^b2),
+            (Nil, Nil) => true,
+            _ => return Nil 
+        };
+        Bool(res)
+    }
+
+    pub fn greater(&self, other: Self) -> Self {
+        use Value::*;
+        let res = match (self, other) {
+            (Int(v1), Int(v2)) => *v1 > v2,
+            (Float(v1), Float(v2)) => *v1 > v2,
+            (Bool(b1), Bool(b2)) => *b1 && (*b1)^b2,
+            (Nil, Nil) => true,
+            _ => return Nil 
+        };
+        Bool(res)
+    }
+
 }
 
 impl fmt::Display for Value {

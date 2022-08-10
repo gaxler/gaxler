@@ -1,21 +1,8 @@
-use crate::{scanner::{TokenType, Token, Scanner}, opcode::{Chunk, OpCode}};
-
-type COMPError<T> = Result<T, CompileError>;
-
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum CompileError {
-    #[error("Source code must be ASCII chars only")]
-    NonASCIIChar,
-    #[error("Syntax error on line {line} at char {ch}")]
-    SyntaxError { line: u32, ch: usize },
-    #[error("Expected Token {0:?} found Token {1:?}")]
-    UnexpectedToken(TokenType, TokenType),
-    #[error("Constant is indexed by u8")]
-    ToManyConstants,
-}
-
+use crate::{
+    errors::{COMPError, CompileError},
+    opcode::{Chunk, OpCode},
+    scanner::{Scanner, Token, TokenType},
+};
 
 #[derive(PartialEq, PartialOrd, Debug, Clone, Copy)]
 #[repr(u8)]
@@ -112,11 +99,11 @@ impl<'a> Parser<'a> {
             LeftParen => {
                 self.expression(Precedence::None)?;
                 self.expect_token(TokenType::RightParen)?;
-            },
+            }
             True | False | Nil => {
                 self.literal()?;
             }
-            Minus => self.unary()?,
+            Minus | Bang => self.unary()?,
 
             _ => {
                 // Expression that doesn't start with a prefix op or a literal is poorly formed
@@ -129,10 +116,10 @@ impl<'a> Parser<'a> {
 
         // now do the infix and the res of those
         // if there is no infix operator here, we are done since the expression was handled
-        
+
         // we just parser an expression, so we either have some infix op that
         // menas the expression continues or its something else. in this case we are done.
-        
+
         loop {
             // let next_prec: Precedence = self.cur.ty.into();
             let next_prec = Precedence::from(self.cur.ty);
@@ -144,8 +131,9 @@ impl<'a> Parser<'a> {
             self.advance();
 
             match self.prev.ty {
-                Minus | Plus | Slash | Star => self.binary()?,
-                _ => break
+                Minus | Plus | Slash | Star | EqualEqual | BangEqual | Greater | GreaterEqual
+                | LessEqual | Less => self.binary()?,
+                _ => break,
             }
         }
         Ok(())
@@ -156,8 +144,7 @@ impl<'a> Parser<'a> {
             TokenType::True => self.emit_op(OpCode::TRUE),
             TokenType::False => self.emit_op(OpCode::FALSE),
             TokenType::Nil => self.emit_op(OpCode::NIL),
-            _ => todo!()
-            
+            _ => todo!(),
         }
         Ok(())
     }
@@ -178,10 +165,25 @@ impl<'a> Parser<'a> {
             TokenType::Minus => self.emit_op(OpCode::SUB),
             TokenType::Star => self.emit_op(OpCode::MUL),
             TokenType::Slash => self.emit_op(OpCode::DIV),
+            TokenType::EqualEqual => self.emit_op(OpCode::EQUAL),
+            TokenType::BangEqual => {
+                self.emit_op(OpCode::EQUAL);
+                self.emit_op(OpCode::NOT);
+            },
+            TokenType::Greater => self.emit_op(OpCode::GREATER),
+            TokenType::GreaterEqual => {
+                self.emit_op(OpCode::LESS);
+                self.emit_op(OpCode::NOT);
+            },
+            TokenType::Less => self.emit_op(OpCode::LESS),
+            TokenType::LessEqual => {
+                self.emit_op(OpCode::GREATER);
+                self.emit_op(OpCode::NOT)
+            }
             _ => {
                 dbg!(self.prev, self.cur);
                 todo!()
-            },
+            }
         }
 
         // let rulle = get_parse_rule(op);
@@ -195,6 +197,7 @@ impl<'a> Parser<'a> {
 
         match op {
             TokenType::Minus => self.emit_op(OpCode::NEGATE),
+            TokenType::Bang => self.emit_op(OpCode::NOT),
             _ => {}
         };
 
@@ -203,10 +206,11 @@ impl<'a> Parser<'a> {
 
     fn number(&mut self) -> COMPError<()> {
         // for now this thing is f32 only
-        let tok_txt= self.scanner.token_text(self.prev).map_err(|_| CompileError::NonASCIIChar)?;
-        let num: f32 = tok_txt
-            .parse()
+        let tok_txt = self
+            .scanner
+            .token_text(self.prev)
             .map_err(|_| CompileError::NonASCIIChar)?;
+        let num: f32 = tok_txt.parse().map_err(|_| CompileError::NonASCIIChar)?;
 
         let const_idx = self.chunk.add_const(num.into());
         if const_idx > (u8::MAX - 1) as usize {
@@ -228,11 +232,20 @@ impl<'a> Parser<'a> {
                         //for now we only want to cath an expression
 
         while self.cur.ty != TokenType::EoF {
-            dbg!(self.cur.ty);
             self.expression(Precedence::Assignment).unwrap();
         }
 
         self.expect_token(TokenType::EoF).unwrap(); // finished reading the whole scanner
         self.emit_op(OpCode::RETURN);
     }
+}
+
+pub fn compile(source: &str) -> Chunk {
+    let mut scanner = Scanner::from_str(source).unwrap();
+    let mut chunk = Chunk::new();
+
+    let mut parser = Parser::init(&mut scanner, &mut chunk);
+    parser.parse();
+
+    chunk
 }

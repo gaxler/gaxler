@@ -2,14 +2,15 @@ mod scanner;
 mod opcode;
 mod vm;
 mod parser;
+mod errors;
 
 use opcode::*;
 use std::fs;
 use std::mem::size_of;
 use vm::disassemble_op;
 use vm::VM;
-use scanner::{dummy_compile, compile};
-
+use scanner::dummy_compile;
+use parser::compile;
 
 enum RunMode {
     Repl,
@@ -51,6 +52,8 @@ fn interpret(source: &str) {
    let chunk = compile(source);
    let mut vm = VM::init(&chunk, true);
    vm.run().unwrap();
+   let res = vm.pop();
+   println!("[Res]: {}", res);
 }
 
 fn repl_callback(input: &str) -> Vec<String> {
@@ -80,7 +83,7 @@ fn repl() {
 }
 
 fn main() {
-    let mode = RunMode::File;
+    let mode = RunMode::Repl;
 
     match mode {
         RunMode::File => {
