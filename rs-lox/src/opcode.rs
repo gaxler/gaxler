@@ -1,11 +1,15 @@
  use std::fmt;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 #[repr(u8)]
 pub enum OpCode {
     RETURN,
     CONSTANT(u8), // load the constant to the vm for use
     NEGATE,
+    NOT,
+    NIL,
+    TRUE,
+    FALSE,
     ADD,
     SUB,
     MUL,
@@ -13,8 +17,10 @@ pub enum OpCode {
 }
 
 #[derive(Clone, Copy, Debug)]
+#[repr(u8)]
 pub enum Value {
-    Null,
+    Nil,
+    Bool(bool),
     Int(i32),  
     Float(f32),
 }
@@ -32,12 +38,35 @@ impl From<i32> for Value {
     }
 }
 
+impl From<bool> for Value {
+    fn from(v: bool) -> Self {
+        Self::Bool(v)
+    }
+}
+
+impl TryFrom<OpCode> for Value {
+
+    type Error = ();
+
+    fn try_from(value: OpCode) -> Result<Self, Self::Error> {
+        let res = match value {
+            OpCode::NIL => Value::Nil,
+            OpCode::TRUE => Value::Bool(true),
+            OpCode::FALSE => Value::Bool(false),
+            _ => return Err(())   
+        };
+        Ok(res)
+    }
+    
+}
+
+
 macro_rules! value_op {
     ($self:ident->$v1: ident, $other:ident->$v2:ident, $e:expr) => {
         match ($self, $other) {
             (Value::Int($v1), Value::Int($v2)) => Value::Int($e),
             (Value::Float($v1), Value::Float($v2)) => Value::Float($e),
-            _ => Value::Null
+            _ => Value::Nil
         }   
     };
 }
@@ -65,7 +94,8 @@ impl fmt::Display for Value {
         match self {
             Value::Int(v) => write!(f, "{}", v),
             Value::Float(v) => write!(f, "{}", v),
-            Value::Null => write!(f, "NULL")
+            Value::Bool(v) => write!(f, "{}", v),
+            Value::Nil => write!(f, "Nil")
             
         }
     }

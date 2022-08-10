@@ -1,7 +1,7 @@
 use std::{
     char,
     iter::{Enumerate, Peekable},
-    str::Chars,
+    str::Chars, string::FromUtf8Error,
 };
 
 use thiserror::Error;
@@ -85,7 +85,7 @@ impl Token {
         }
     }
 
-    fn make_error(line: u32) -> Self {
+    pub fn empty(line: u32) -> Self {
         Self {
             ty: TokenType::Error,
             start_pos: 0,
@@ -98,9 +98,9 @@ impl Token {
 pub(crate) struct Scanner<'a> {
     ascii_chars: &'a [u8],
     chars: Peekable<Enumerate<Chars<'a>>>,
-    start_pos: usize,
-    cur_pos: usize,
-    line: u32,
+    pub start_pos: usize,
+    pub cur_pos: usize,
+    pub line: u32,
 }
 
 enum MatchState {
@@ -307,6 +307,11 @@ impl<'a> Scanner<'a> {
         })
         // Token::make_error(self.line)
     }
+    pub fn token_text(&self, tok: Token) -> Result<String, FromUtf8Error>{
+        let chars = self.ascii_chars[tok.start_pos..(tok.start_pos+tok.len)].to_vec();
+        String::from_utf8(chars)
+
+    }
 }
 
 pub fn dummy_compile(source: &str) -> COMPError<()> {
@@ -329,10 +334,7 @@ pub fn dummy_compile(source: &str) -> COMPError<()> {
                 break;
             }
             _ => {
-                let tok_lexeme = scanner.ascii_chars[tok.start_pos..(tok.start_pos + tok.len)]
-                    .to_ascii_lowercase();
-                let tok_str = std::str::from_utf8(&tok_lexeme)
-                    .expect("Couldnt build string from token bytes");
+                let tok_str = scanner.token_text(tok)?;
                 println!(" {:?} {}", tok.ty, tok_str);
             }
         }
@@ -387,8 +389,8 @@ struct Parser<'a> {
 impl<'a> Parser<'a> {
     fn init(scanner: &'a mut Scanner<'a>, chunk: &'a mut Chunk) -> Self {
         let parser = Self {
-            cur: Token::make_error(0),
-            prev: Token::make_error(0),
+            cur: Token::empty(0),
+            prev: Token::empty(0),
             had_error: false,
             panic_mode: false,
             scanner,
@@ -426,7 +428,6 @@ impl<'a> Parser<'a> {
     }
 
     fn expression(&mut self, min_prec: Precedence) -> COMPError<()> {
-        // parents always have expression inside of them
         use TokenType::*;
 
         // do the prefix op first
@@ -438,11 +439,11 @@ impl<'a> Parser<'a> {
                 self.expression(Precedence::None)?;
                 self.expect_token(TokenType::RightParen)?;
             },
-            // temporaary for debug. minus can mean many things.
-            String => {
-                todo!(" Can't work with strings yet")
+            True | False | Nil => {
+                self.literal()?;
             }
             Minus => self.unary()?,
+
             _ => {
                 // Expression that doesn't start with a prefix op or a literal is poorly formed
                 return Err(CompileError::SyntaxError {
@@ -455,7 +456,7 @@ impl<'a> Parser<'a> {
         // now do the infix and the res of those
         // if there is no infix operator here, we are done since the expression was handled
         
-        // we just parced an expression, so we either have some infix op that
+        // we just parser an expression, so we either have some infix op that
         // menas the expression continues or its something else. in this case we are done.
         
         loop {
@@ -472,6 +473,17 @@ impl<'a> Parser<'a> {
                 Minus | Plus | Slash | Star => self.binary()?,
                 _ => break
             }
+        }
+        Ok(())
+    }
+
+    fn literal(&mut self) -> COMPError<()> {
+        match self.prev.ty {
+            TokenType::True => self.emit_op(OpCode::TRUE),
+            TokenType::False => self.emit_op(OpCode::FALSE),
+            TokenType::Nil => self.emit_op(OpCode::NIL),
+            _ => todo!()
+            
         }
         Ok(())
     }
@@ -543,6 +555,7 @@ impl<'a> Parser<'a> {
                         //for now we only want to cath an expression
 
         while self.cur.ty != TokenType::EoF {
+            dbg!(self.cur.ty);
             self.expression(Precedence::Assignment).unwrap();
         }
 
