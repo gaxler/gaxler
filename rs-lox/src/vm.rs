@@ -1,10 +1,11 @@
-use std::{cell::RefCell};
+use std::cell::RefCell;
 
-use crate::{opcode::{Chunk, OpCode, Value}, errors::{RTError, RuntimeError}};
-
+use crate::{
+    errors::{RTError, RuntimeError},
+    opcode::{Chunk, OpCode}, value::Value,
+};
 
 const STACK_MAX: usize = 256;
-
 
 pub fn disassemble_op(chunk: &Chunk, offset: usize) {
     use OpCode::*;
@@ -21,13 +22,12 @@ pub fn disassemble_op(chunk: &Chunk, offset: usize) {
         CONSTANT(idx) => {
             let const_val = chunk.consts[*idx as usize];
             println!("OP: CONSTANT ({})", const_val)
-        },
+        }
         t => {
-            println!("OP: {:?}", t); 
+            println!("OP: {:?}", t);
         }
     }
 }
-
 
 pub struct Stack {
     stack: [Value; STACK_MAX],
@@ -68,40 +68,27 @@ fn exec_unary(op: &OpCode, stack: &mut Stack) -> RTError<()> {
     use OpCode::*;
 
     let unary_inp = stack.pop()?;
-    
-    let unary_result = match op {
-        NEGATE => {
-            match unary_inp {
-                Value::Int(v) => Value::Int(-v),
-                Value::Float(v) => Value::Float(-v),
-                Value::Nil => Value::Nil,
-                Value::Bool(_) => return Err(RuntimeError::IllegalUnaryOp(*op, unary_inp)),
-            }
-        },
-        // Take a value out of the stack, and negate it. 
-        //  is defined on the value enum that should be 
 
-        NOT => {
-            match unary_inp {
-                Value::Bool(b) => Value::Bool(!b),
-                Value::Nil => Value::Bool(true),
-                _ => return Err(RuntimeError::IllegalUnaryOp(*op, unary_inp))
-                
-            }
-        }
+    let unary_result = match op {
+        NEGATE => match unary_inp {
+            Value::Int(v) => Value::Int(-v),
+            Value::Float(v) => Value::Float(-v),
+            Value::Nil => Value::Nil,
+            _ => return Err(RuntimeError::IllegalUnaryOp(*op, unary_inp)),
+        },
+        // Take a value out of the stack, and negate it.
+        //  is defined on the value enum that should be
+        NOT => match unary_inp {
+            Value::Bool(b) => Value::Bool(!b),
+            Value::Nil => Value::Bool(true),
+            _ => return Err(RuntimeError::IllegalUnaryOp(*op, unary_inp)),
+        },
         _ => panic!("Not a unary op!!"),
     };
-    
+
     stack.push(unary_result)?;
 
     Ok(())
-}
-
-fn _binary_nil_error(op: OpCode, v1: Value, v2: Value, res: Value) -> RTError<Value> {
-    if let Value::Nil = res {
-        return Err(RuntimeError::IllegalOp(op, v1, v2));
-    }
-    Ok(res)
 }
 
 fn exec_binary(op: &OpCode, stack: &mut Stack) -> Result<(), RuntimeError> {
@@ -109,7 +96,6 @@ fn exec_binary(op: &OpCode, stack: &mut Stack) -> Result<(), RuntimeError> {
 
     let v2 = stack.pop()?;
     let v1 = stack.pop()?;
-    
 
     let res = match op {
         ADD => v1.add(v2),
@@ -189,9 +175,8 @@ impl<'a> VM<'a> {
                     if val.is_ok() {
                         self.push(val.unwrap());
                     }
-                    
                 }
-                
+
                 ADD | SUB | MUL | DIV | LESS | GREATER | EQUAL => {
                     let mut s = self.stack.borrow_mut();
                     exec_binary(op, &mut s).unwrap();

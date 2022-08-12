@@ -7,5 +7,4 @@ edition = "2021"
 
 [dependencies]
 thiserror = "1.0.32"
-clap = "3.2.16"
 linenoise-rust = "0.2.1"

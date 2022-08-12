@@ -3,7 +3,11 @@ pub type COMPError<T> = Result<T, CompileError>;
 pub type RTError<T> = Result<T, RuntimeError>;
 use thiserror::Error;
 
-use crate::{scanner::TokenType, opcode::{OpCode, Value}};
+use crate::{
+    opcode::OpCode,
+    value::Value,
+    scanner::TokenType,
+};
 
 #[derive(Debug, Error)]
 pub enum CompileError {
@@ -26,4 +30,3 @@ pub enum RuntimeError {
     #[error("Op {0:?} not allowed on types {1:?} and {2:?}")]
     IllegalOp(OpCode, Value, Value),
 }
-

@@ -1,22 +1,20 @@
-mod scanner;
-mod opcode;
-mod vm;
-mod parser;
 mod errors;
+mod opcode;
+mod parser;
+mod scanner;
+mod vm;
+mod value;
 
-use opcode::*;
 use std::fs;
 use std::mem::size_of;
 use vm::disassemble_op;
 use vm::VM;
-use scanner::dummy_compile;
+// use scanner::dummy_compile;
 use parser::compile;
+use std::env;
+use opcode::Chunk;
 
-enum RunMode {
-    Repl,
-    File,
-    ShitCode,
-}
+use crate::value::Value;
 
 pub fn disassemble_chunk(chunk: &Chunk, name: &str) {
     println!("=== {} ===", name);
@@ -27,33 +25,23 @@ pub fn disassemble_chunk(chunk: &Chunk, name: &str) {
 }
 
 fn shitcode() {
+    use opcode::*;
+
     println!("Size of OpCode is {} bytes", size_of::<OpCode>());
-    let mut chunk = Chunk::new();
-    chunk.add_const(Value::Int(28));
-    chunk.add_op(OpCode::CONSTANT(0), 1);
-    chunk.add_op(OpCode::NEGATE, 2);
-    chunk.add_op(OpCode::ADD, 3);
-    chunk.add_op(OpCode::RETURN, 3);
-    let mut vm = VM::init(&chunk, true);
-    vm.push(Value::Float(9.14));
-    vm.push(Value::Float(9.14));
+    println!("Size of Value is {} bytes", size_of::<Value>());
+    println!("Size of String is {} bytes", size_of::<String>());
+    println!("Size of Vec is {} bytes", size_of::<Vec<String>>());
+    println!("Size of Vec is {} bytes", size_of::<Vec<*mut u8>>());
 
-    println!("\n=== Execution ===");
 
-    vm.run().unwrap();
 }
 
 fn interpret(source: &str) {
-    // let mut chunk = compile(source);
-    // let mut vm = VM::init(&chunk, true);
-    // vm.run();
-
-    // dummy_compile(source).unwrap();
-   let chunk = compile(source);
-   let mut vm = VM::init(&chunk, true);
-   vm.run().unwrap();
-   let res = vm.pop();
-   println!("[Res]: {}", res);
+    let chunk = compile(source);
+    let mut vm = VM::init(&chunk, true);
+    vm.run().unwrap();
+    let res = vm.pop();
+    println!("[Res]: {}", res);
 }
 
 fn repl_callback(input: &str) -> Vec<String> {
@@ -83,20 +71,16 @@ fn repl() {
 }
 
 fn main() {
-    let mode = RunMode::Repl;
 
-    match mode {
-        RunMode::File => {
-            let source = fs::read_to_string("expr.lox").unwrap();
+    match env::args().nth(1) {
+        None => repl(),
+        Some(txt) => {
+            if txt == "info" {
+                shitcode();
+                return ;
+            }
+            let source = fs::read_to_string(txt).unwrap();
             interpret(&source);
-
-        }
-        RunMode::Repl => {
-            repl();
-        }
-
-        RunMode::ShitCode => {
-            shitcode();
         }
     }
 }

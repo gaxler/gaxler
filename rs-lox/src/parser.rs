@@ -169,12 +169,12 @@ impl<'a> Parser<'a> {
             TokenType::BangEqual => {
                 self.emit_op(OpCode::EQUAL);
                 self.emit_op(OpCode::NOT);
-            },
+            }
             TokenType::Greater => self.emit_op(OpCode::GREATER),
             TokenType::GreaterEqual => {
                 self.emit_op(OpCode::LESS);
                 self.emit_op(OpCode::NOT);
-            },
+            }
             TokenType::Less => self.emit_op(OpCode::LESS),
             TokenType::LessEqual => {
                 self.emit_op(OpCode::GREATER);

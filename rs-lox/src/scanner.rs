@@ -1,7 +1,8 @@
 use std::{
     char,
     iter::{Enumerate, Peekable},
-    str::Chars, string::FromUtf8Error,
+    str::Chars,
+    string::FromUtf8Error,
 };
 
 use crate::errors::{COMPError, CompileError};
@@ -308,10 +309,9 @@ impl<'a> Scanner<'a> {
         })
         // Token::make_error(self.line)
     }
-    pub fn token_text(&self, tok: Token) -> Result<String, FromUtf8Error>{
-        let chars = self.ascii_chars[tok.start_pos..(tok.start_pos+tok.len)].to_vec();
+    pub fn token_text(&self, tok: Token) -> Result<String, FromUtf8Error> {
+        let chars = self.ascii_chars[tok.start_pos..(tok.start_pos + tok.len)].to_vec();
         String::from_utf8(chars)
-
     }
 }
 
@@ -335,7 +335,9 @@ pub fn dummy_compile(source: &str) -> COMPError<()> {
                 break;
             }
             _ => {
-                let tok_str = scanner.token_text(tok).map_err(|_| CompileError::NonASCIIChar)?;
+                let tok_str = scanner
+                    .token_text(tok)
+                    .map_err(|_| CompileError::NonASCIIChar)?;
                 println!(" {:?} {}", tok.ty, tok_str);
             }
         }
@@ -343,5 +345,3 @@ pub fn dummy_compile(source: &str) -> COMPError<()> {
     }
     Ok(())
 }
-
-
