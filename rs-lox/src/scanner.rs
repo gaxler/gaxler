@@ -69,7 +69,7 @@ pub enum TokenType {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct Token {
+pub struct Token {
     pub ty: TokenType,
     pub start_pos: usize,
     pub len: usize,
@@ -78,10 +78,16 @@ pub(crate) struct Token {
 
 impl Token {
     fn make(token_type: TokenType, scanner: &Scanner) -> Self {
-        let len = scanner.cur_pos - scanner.start_pos;
+        let (start_pos, len) = match token_type {
+           TokenType::String => {
+            (scanner.start_pos+1, scanner.cur_pos-scanner.start_pos-2)   
+           } 
+           _ => (scanner.start_pos, scanner.cur_pos -scanner.start_pos)
+        };
+        
         Self {
             ty: token_type,
-            start_pos: scanner.start_pos,
+            start_pos, 
             len,
             line: scanner.line,
         }
@@ -97,7 +103,7 @@ impl Token {
     }
 }
 
-pub(crate) struct Scanner<'a> {
+pub struct Scanner<'a> {
     ascii_chars: &'a [u8],
     chars: Peekable<Enumerate<Chars<'a>>>,
     pub start_pos: usize,

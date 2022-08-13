@@ -4,9 +4,12 @@ mod parser;
 mod scanner;
 mod vm;
 mod value;
+mod session;
 
+use std::cell::RefCell;
 use std::fs;
 use std::mem::size_of;
+use session::RuntimeContext;
 use vm::disassemble_op;
 use vm::VM;
 // use scanner::dummy_compile;
@@ -38,11 +41,13 @@ fn shitcode() {
 
 fn interpret(source: &str) {
     let chunk = compile(source);
-    let mut vm = VM::init(&chunk, true);
+    let mut vm = VM::init(true);
+    vm.load_chunk(chunk);
     vm.run().unwrap();
     let res = vm.pop();
     println!("[Res]: {}", res);
 }
+
 
 fn repl_callback(input: &str) -> Vec<String> {
     let ret: Vec<&str>;
@@ -59,12 +64,23 @@ fn repl() {
     // linenoise::set_callback(repl_callback);
     linenoise::set_multiline(3);
 
+    let mut runtime = RuntimeContext::start(true);
+
+
     loop {
         let val = linenoise::input("> ");
         if let Some(cmd) = val {
             match cmd.as_str() {
-                ":q" => break,
-                s => interpret(s),
+                ":q" => {
+                    runtime.debug_report();
+                    break
+                },
+                // s => interpret(s),
+                s => { 
+                    let expr_id = runtime.compile(s); 
+                    runtime.exec(expr_id);
+
+                }
             }
         }
     }

@@ -1,7 +1,9 @@
+use std::cell::{RefMut, RefCell};
+
 use crate::{
     errors::{COMPError, CompileError},
     opcode::{Chunk, OpCode},
-    scanner::{Scanner, Token, TokenType},
+    scanner::{Scanner, Token, TokenType}, value::Value,
 };
 
 #[derive(PartialEq, PartialOrd, Debug, Clone, Copy)]
@@ -38,17 +40,19 @@ impl From<TokenType> for Precedence {
     }
 }
 
-struct Parser<'a> {
+pub struct Parser<'a> {
     cur: Token,
     prev: Token,
     had_error: bool,
     panic_mode: bool,
     scanner: &'a mut Scanner<'a>,
     chunk: &'a mut Chunk,
+    // heap: RefMut<'a, Heap>
 }
 
 impl<'a> Parser<'a> {
-    fn init(scanner: &'a mut Scanner<'a>, chunk: &'a mut Chunk) -> Self {
+    // pub fn init(scanner: &'a mut Scanner<'a>, chunk: &'a mut Chunk, heap:RefMut<'a, Heap>) -> Self {
+    pub fn init(scanner: &'a mut Scanner<'a>, chunk: &'a mut Chunk) -> Self {
         let parser = Self {
             cur: Token::empty(0),
             prev: Token::empty(0),
@@ -56,6 +60,7 @@ impl<'a> Parser<'a> {
             panic_mode: false,
             scanner,
             chunk,
+            // heap,
         };
         parser
     }
@@ -96,6 +101,7 @@ impl<'a> Parser<'a> {
 
         match self.prev.ty {
             Number => self.number()?,
+            String => self.string()?,
             LeftParen => {
                 self.expression(Precedence::None)?;
                 self.expect_token(TokenType::RightParen)?;
@@ -204,6 +210,17 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    fn string(&mut self) -> COMPError<()> {
+        let tok_txt = self
+        .scanner
+        .token_text(self.prev)
+        .map_err(|_| CompileError::NonASCIIChar)?;
+        
+        let const_idx = self.chunk.add_const(Value::String(tok_txt));
+        self.emit_op(OpCode::CONSTANT(const_idx as u8));
+        Ok(())
+    }
+
     fn number(&mut self) -> COMPError<()> {
         // for now this thing is f32 only
         let tok_txt = self
@@ -226,7 +243,7 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn parse(&mut self) {
+    pub fn parse(&mut self) {
         // we got a scanner and a chunk, now it's time to start writing
         self.advance(); // get the first token for now ignore errors
                         //for now we only want to cath an expression
@@ -243,8 +260,9 @@ impl<'a> Parser<'a> {
 pub fn compile(source: &str) -> Chunk {
     let mut scanner = Scanner::from_str(source).unwrap();
     let mut chunk = Chunk::new();
+    // let mut heap = RefCell::new(Heap::init());
 
-    let mut parser = Parser::init(&mut scanner, &mut chunk);
+    let mut parser = Parser::init(&mut scanner, &mut chunk); 
     parser.parse();
 
     chunk
