@@ -4,9 +4,11 @@ Following [Crafting Interpreters](https://craftinginterpreters.com/) in Rust. Th
 At first I aim to just make the thing run to spec. Later on will try to optimize some parts of it.
 
 ## Aug 14, 2022
+* `cargo t -- —no capture` to dump prints and dbg! During lib testing
 * Debugging annoying bug, it seems that print statement doesn’t put global variable on the stack. 
 	* I didn’t handle the NIL OpCode and posed instead of peeked for global variable setting 🙃 🤡 
 		* That’s why my pop operation was failing…
+* Going to try and play with cargo workspaces. Want to separate my code into three crates, runtime (vm, opcode, 
 ## Aug 13, 2022
 * Using `&str` as key for my global var store.
 	* I store identifiers as heap strings, inside OpCode chunks. To prevent string copies, I hash the string slice (which is a pointer with length) of each identifier. 
