@@ -7,21 +7,6 @@ use std::{
 
 use crate::errors::{COMPError, CompileError};
 
-// use thiserror::Error;
-
-// type COMPError<T> = Result<T, CompileError>;
-
-// #[derive(Debug, Error)]
-// pub enum CompileError {
-//     #[error("Source code must be ASCII chars only")]
-//     NonASCIIChar,
-//     #[error("Syntax error on line {line} at char {ch}")]
-//     SyntaxError { line: u32, ch: usize },
-//     #[error("Expected Token {0:?} found Token {1:?}")]
-//     UnexpectedToken(TokenType, TokenType),
-//     #[error("Constant is indexed by u8")]
-//     ToManyConstants,
-// }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
@@ -115,22 +100,23 @@ enum MatchState {
     SyntaxError,
     ScanNext,
     ScanNextLine,
-    Match(Token),
+    Matched(Token),
 }
 
-macro_rules! match_next {
-    ($scanner:ident, $ch:literal, $match_ty:ident, $else_ty:ident) => {
-        if $scanner.match_next($ch) {
+macro_rules! next_is_or {
+    ($ch:literal, $match_ty:ident, $else_ty:ident, $scanner:ident) => {
+        if $scanner.next_is($ch) {
             $scanner.cur_pos += 1;
             $scanner.chars.next();
-            MatchState::Match($scanner._tok($match_ty))
+            MatchState::Matched($scanner._tok($match_ty))
         } else {
-            MatchState::Match($scanner._tok($else_ty))
+            MatchState::Matched($scanner._tok($else_ty))
         }
     };
 }
 
 impl<'a> Scanner<'a> {
+
     pub fn from_str(source: &'a str) -> COMPError<Self> {
         if !source.is_ascii() {
             return Err(CompileError::NonASCIIChar);
@@ -145,11 +131,57 @@ impl<'a> Scanner<'a> {
         })
     }
 
+    pub fn scan_token(&mut self) -> COMPError<Token> {
+        use TokenType::*;
+
+        self.start_pos = self.cur_pos;
+
+        if self.cur_pos >= self.ascii_chars.len() {
+            return Ok(self._tok(EoF));
+        }
+
+        'eval_loop: loop {
+            match self.move_to_next_char() {
+                None => return Ok(self._tok(EoF)),
+                Some((_, ch)) => {
+                    match self._token_matcher(ch) {
+                        MatchState::Matched(tok) => return Ok(tok),
+                        MatchState::ScanNextLine => {
+                            self.line += 1;
+                            self.start_pos = self.cur_pos;
+                            continue 'eval_loop;
+                        }
+                        MatchState::ScanNext => {
+                            self.start_pos = self.cur_pos;
+                            continue 'eval_loop;
+                        }
+
+                        MatchState::SyntaxError => {
+                            //Placeholder for error handling
+                        }
+                    }
+                }
+            }
+            break;
+        }
+        Err(CompileError::SyntaxError {
+            line: self.line,
+            ch: self.start_pos,
+        })
+        // Token::make_error(self.line)
+    }
+
+    pub fn token_text(&self, tok: Token) -> COMPError<String> {
+        let chars = self.ascii_chars[tok.start_pos..(tok.start_pos + tok.len)].to_vec();
+        String::from_utf8(chars).map_err(|_| CompileError::NonASCIIChar)
+    }
+
+
     fn _tok(&self, tok_type: TokenType) -> Token {
         Token::make(tok_type, &self)
     }
 
-    fn match_next(&mut self, ch: char) -> bool {
+    fn next_is(&mut self, ch: char) -> bool {
         let next_ = self.chars.peek();
         if next_.is_none() {
             return false;
@@ -159,8 +191,16 @@ impl<'a> Scanner<'a> {
         *actual == ch
     }
 
-    fn match_keywords(&self, st: usize, en: usize) -> Token {
+    fn keyword_or_ident(&self, st: usize, en: usize) -> Token {
+        
+        // the shortest keyword is 2 chars
+        if en - st < 1 {
+            return self._tok(TokenType::Ident);
+        }
+
         let first_char = self.ascii_chars[st] as char;
+        let second_char = self.ascii_chars[st+1] as char;
+
         let match_rest = |tgt: &str, kw: TokenType| {
             if tgt
                 .as_bytes()
@@ -172,6 +212,7 @@ impl<'a> Scanner<'a> {
                 self._tok(TokenType::Ident)
             }
         };
+
 
         match first_char {
             'a' => match_rest("nd", TokenType::And),
@@ -185,13 +226,13 @@ impl<'a> Scanner<'a> {
             's' => match_rest("uper", TokenType::Super),
             'v' => match_rest("ar", TokenType::Var),
             'w' => match_rest("hile", TokenType::While),
-            'f' => match self.ascii_chars[st + 1] as char {
+            'f' => match second_char {
                 'u' => match_rest("un", TokenType::Fun),
                 'o' => match_rest("or", TokenType::For),
                 'a' => match_rest("alse", TokenType::False),
                 _ => self._tok(TokenType::Ident),
             },
-            't' => match self.ascii_chars[st + 1] as char {
+            't' => match second_char {
                 'h' => match_rest("his", TokenType::This),
                 'r' => match_rest("rue", TokenType::True),
                 _ => self._tok(TokenType::Ident),
@@ -203,68 +244,69 @@ impl<'a> Scanner<'a> {
 
     fn _token_matcher(&mut self, ch: char) -> MatchState {
         use TokenType::*;
+        use MatchState::*;
 
         match ch {
             '0'..='9' => {
                 while let Some(&(_, '0'..='9' | '.')) = self.peek() {
-                    self.advance();
+                    self.move_to_next_char();
                 }
-                MatchState::Match(self._tok(Number))
+                Matched(self._tok(Number))
             }
             'a'..='z' | 'A'..='Z' | '_' => {
                 while let Some(&(_, 'a'..='z' | 'A'..='Z' | '_' | '0'..='9')) = self.peek() {
-                    self.advance();
+                    self.move_to_next_char();
                 }
                 // this is the place we need to check and see what kind of string do we got here
-                MatchState::Match(self.match_keywords(self.start_pos, self.cur_pos))
+                Matched(self.keyword_or_ident(self.start_pos, self.cur_pos))
             }
-            '(' => MatchState::Match(self._tok(LeftParen)),
-            ')' => MatchState::Match(self._tok(RightParen)),
-            '{' => MatchState::Match(self._tok(LeftBrace)),
-            '}' => MatchState::Match(self._tok(RightBrace)),
-            ';' => MatchState::Match(self._tok(Semicolon)),
-            ',' => MatchState::Match(self._tok(Comma)),
-            '.' => MatchState::Match(self._tok(Dot)),
-            '-' => MatchState::Match(self._tok(Minus)),
-            '+' => MatchState::Match(self._tok(Plus)),
+            '(' => Matched(self._tok(LeftParen)),
+            ')' => Matched(self._tok(RightParen)),
+            '{' => Matched(self._tok(LeftBrace)),
+            '}' => Matched(self._tok(RightBrace)),
+            ';' => Matched(self._tok(Semicolon)),
+            ',' => Matched(self._tok(Comma)),
+            '.' => Matched(self._tok(Dot)),
+            '-' => Matched(self._tok(Minus)),
+            '+' => Matched(self._tok(Plus)),
             '/' => {
-                if self.match_next('/') {
-                    while !self.match_next('\n') {
-                        if self.advance().is_none() {
-                            return MatchState::Match(self._tok(EoF));
+                if self.next_is('/') {
+                    while !self.next_is('\n') {
+                        if self.move_to_next_char().is_none() {
+                            return Matched(self._tok(EoF));
                         }
                     }
-                    MatchState::ScanNext
+                    ScanNext
                 } else {
-                    MatchState::Match(self._tok(Slash))
+                    Matched(self._tok(Slash))
                 }
             }
-            '*' => MatchState::Match(self._tok(Star)),
-            '!' => match_next!(self, '=', BangEqual, Bang),
-            '=' => match_next!(self, '=', EqualEqual, Equal),
-            '<' => match_next!(self, '=', LessEqual, Less),
-            '>' => match_next!(self, '=', GreaterEqual, Greater),
+            '*' => Matched(self._tok(Star)),
+            '!' => next_is_or!('=', BangEqual, Bang, self),
+            '=' => next_is_or!('=', EqualEqual, Equal, self),
+            '<' => next_is_or!('=', LessEqual, Less, self),
+            '>' => next_is_or!('=', GreaterEqual, Greater, self),
             // '"' => MatchState::StringLit,
             '"' => {
-                while !self.match_next('"') {
-                    match self.advance() {
-                        None => return MatchState::SyntaxError,
+                while !self.next_is('"') {
+                    match self.move_to_next_char() {
+                        None => return SyntaxError,
                         Some((_, '\n')) => {
                             self.line += 1;
                         }
                         _ => {}
                     }
                 }
-                self.advance();
-                MatchState::Match(self._tok(TokenType::String))
+                self.move_to_next_char();
+                Matched(self._tok(String))
             }
-            '\n' => MatchState::ScanNextLine,
-            ' ' | '\t' => MatchState::ScanNext,
-            _ => MatchState::SyntaxError,
+            '\n' => ScanNextLine,
+            ' ' | '\t' => ScanNext,
+            _ => SyntaxError,
         }
     }
 
-    fn advance(&mut self) -> Option<(usize, char)> {
+    fn move_to_next_char(&mut self) -> Option<(usize, char)> {
         let next_ = self.chars.next();
         if next_.is_some() {
             self.cur_pos += 1;
@@ -276,49 +318,7 @@ impl<'a> Scanner<'a> {
         self.chars.peek()
     }
 
-    pub fn scan_token(&mut self) -> COMPError<Token> {
-        use TokenType::*;
-
-        self.start_pos = self.cur_pos;
-
-        if self.cur_pos >= self.ascii_chars.len() {
-            return Ok(self._tok(EoF));
-        }
-
-        'eval_loop: loop {
-            match self.advance() {
-                None => return Ok(self._tok(EoF)),
-                Some((_, ch)) => {
-                    match self._token_matcher(ch) {
-                        MatchState::Match(tok) => return Ok(tok),
-                        MatchState::ScanNextLine => {
-                            self.line += 1;
-                            self.start_pos = self.cur_pos;
-                            continue 'eval_loop;
-                        }
-                        MatchState::ScanNext => {
-                            self.start_pos = self.cur_pos;
-                            continue 'eval_loop;
-                        }
-
-                        MatchState::SyntaxError => {
-                            // Place holder for error handling
-                        }
-                    }
-                }
-            }
-            break;
-        }
-        Err(CompileError::SyntaxError {
-            line: self.line,
-            ch: self.start_pos,
-        })
-        // Token::make_error(self.line)
-    }
-    pub fn token_text(&self, tok: Token) -> Result<String, FromUtf8Error> {
-        let chars = self.ascii_chars[tok.start_pos..(tok.start_pos + tok.len)].to_vec();
-        String::from_utf8(chars)
-    }
+    
 }
 
 pub fn dummy_compile(source: &str) -> COMPError<()> {

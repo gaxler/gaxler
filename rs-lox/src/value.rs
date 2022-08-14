@@ -34,6 +34,16 @@ impl From<bool> for Value {
     }
 }
 
+impl TryFrom<Value> for String {
+    type Error = ();
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        if let Value::String(s) = value {
+            return Ok(s);
+        } 
+        Err(())
+    }
+}
+
 impl TryFrom<OpCode> for Value {
     type Error = ();
 
@@ -142,7 +152,7 @@ impl fmt::Display for Value {
             Value::Int(v) => write!(f, "{}", v),
             Value::Float(v) => write!(f, "{}", v),
             Value::Bool(v) => write!(f, "{}", v),
-            Value::String(v) => write!(f, "String@ '{:04 }'", v),
+            Value::String(v) => write!(f, "{}", v),
             Value::Nil => write!(f, "Nil"),
         }
     }

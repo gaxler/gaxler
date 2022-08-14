@@ -6,46 +6,43 @@ mod vm;
 mod value;
 mod session;
 
-use std::cell::RefCell;
 use std::fs;
-use std::mem::size_of;
+use std::mem::{size_of, align_of};
 use session::RuntimeContext;
-use vm::disassemble_op;
-use vm::VM;
-// use scanner::dummy_compile;
-use parser::compile;
 use std::env;
-use opcode::Chunk;
 
 use crate::value::Value;
 
-pub fn disassemble_chunk(chunk: &Chunk, name: &str) {
-    println!("=== {} ===", name);
-
-    for (idx, _) in chunk.ops.iter().enumerate() {
-        disassemble_op(chunk, idx);
-    }
-}
 
 fn shitcode() {
     use opcode::*;
 
-    println!("Size of OpCode is {} bytes", size_of::<OpCode>());
-    println!("Size of Value is {} bytes", size_of::<Value>());
-    println!("Size of String is {} bytes", size_of::<String>());
-    println!("Size of Vec is {} bytes", size_of::<Vec<String>>());
-    println!("Size of Vec is {} bytes", size_of::<Vec<*mut u8>>());
-
+    println!("OpCode: size is {} bytes", size_of::<OpCode>());
+    println!("Value: size is {} bytes, align is {} bytes", size_of::<Value>(), align_of::<Value>());
+    println!("String: size {} bytes, align {} bytes ", size_of::<String>(), align_of::<String>());
+    println!("Size of String Vec is {} bytes", size_of::<Vec<String>>());
+    println!("Size of Pointer Vec is {} bytes", size_of::<Vec<*mut u8>>());
 
 }
 
-fn interpret(source: &str) {
-    let chunk = compile(source);
-    let mut vm = VM::init(true);
-    vm.load_chunk(chunk);
-    vm.run().unwrap();
-    let res = vm.pop();
-    println!("[Res]: {}", res);
+fn interpret(source: &str, debug: bool) {
+
+    let mut runtime = RuntimeContext::start(debug);
+    let ch_id = match runtime.compile(source) {
+        Ok(idx) => idx,
+        Err(e) => {
+            println!(" Error: [{}]", e);
+            return;
+        }
+        
+    };
+    match runtime.exec(ch_id) {
+        Ok(_) => {},
+        Err(e) => {
+            println!(" Error: [{}]", e);
+            return; 
+        }
+    }
 }
 
 
@@ -64,7 +61,7 @@ fn repl() {
     // linenoise::set_callback(repl_callback);
     linenoise::set_multiline(3);
 
-    let mut runtime = RuntimeContext::start(true);
+    let mut runtime = RuntimeContext::start(false);
 
 
     loop {
@@ -75,11 +72,20 @@ fn repl() {
                     runtime.debug_report();
                     break
                 },
+                ":verbose" => {
+                    
+                }
                 // s => interpret(s),
                 s => { 
                     let expr_id = runtime.compile(s); 
-                    runtime.exec(expr_id);
-
+                    match expr_id {
+                        Err(e) => println!("  Err: [{}]", e),
+                        Ok(idx) => {
+                            if let Err(e) = runtime.exec(idx) {
+                                println!("  Err: [{}]", e); 
+                            }
+                        },
+                    }
                 }
             }
         }
@@ -87,16 +93,16 @@ fn repl() {
 }
 
 fn main() {
-
-    match env::args().nth(1) {
-        None => repl(),
-        Some(txt) => {
+    match (env::args().nth(1), env::args().nth(2)) {
+        (None, _) => repl(),
+        (Some(txt), debug) => {
             if txt == "info" {
                 shitcode();
                 return ;
             }
+            let dbg = debug.is_some();
             let source = fs::read_to_string(txt).unwrap();
-            interpret(&source);
+            interpret(&source, dbg);
         }
     }
 }

@@ -1,44 +1,11 @@
-use std::cell::{RefMut, RefCell};
 
 use crate::{
     errors::{COMPError, CompileError},
-    opcode::{Chunk, OpCode},
-    scanner::{Scanner, Token, TokenType}, value::Value,
+    opcode::{Chunk, ConstIdx, OpCode},
+    scanner::{Scanner, Token, TokenType},
+    value::Value,
 };
 
-#[derive(PartialEq, PartialOrd, Debug, Clone, Copy)]
-#[repr(u8)]
-enum Precedence {
-    None,
-    Assignment, // =
-    Or,
-    And,
-    Equality,   // == !=
-    Comparison, // < > <= >=
-    Term,       // + -
-    Factor,     // * /
-    Unary,      // !, -
-    Call,       // . f()
-    Primary,
-}
-
-impl From<TokenType> for Precedence {
-    fn from(ty: TokenType) -> Self {
-        use TokenType::*;
-
-        match ty {
-            Equal => Self::Assignment,
-            Or => Self::Or,
-            And => Self::And,
-            EqualEqual | BangEqual => Self::Equality,
-            Greater | GreaterEqual | Less | LessEqual => Self::Comparison,
-            Plus | Minus => Self::Term, // what happens in unary setting with minus?
-            Star | Slash => Self::Factor,
-            Dot => Self::Call,
-            _ => Self::None,
-        }
-    }
-}
 
 pub struct Parser<'a> {
     cur: Token,
@@ -52,64 +19,96 @@ pub struct Parser<'a> {
 
 impl<'a> Parser<'a> {
     // pub fn init(scanner: &'a mut Scanner<'a>, chunk: &'a mut Chunk, heap:RefMut<'a, Heap>) -> Self {
-    pub fn init(scanner: &'a mut Scanner<'a>, chunk: &'a mut Chunk) -> Self {
-        let parser = Self {
-            cur: Token::empty(0),
-            prev: Token::empty(0),
-            had_error: false,
-            panic_mode: false,
-            scanner,
-            chunk,
-            // heap,
-        };
-        parser
+
+    pub fn parse(&mut self) -> COMPError<()> {
+        // we got a scanner and a chunk, now it's time to start writing
+        self.move_to_next_token(); // get the first token for now ignore errors
+                                   //for now we only want to cath an expression
+        while self.cur.ty != TokenType::EoF {
+            self.declaration()?;
+            // self.expression(Precedence::Assignme"nt).unwrap();
+        }
+
+        self.cur_must_be(TokenType::EoF)?; // finished reading the whole scanner
+        self.emit_op(OpCode::RETURN);
+        Ok(())
     }
 
-    fn advance(&mut self) {
-        match self.scanner.scan_token() {
-            Ok(tok) => {
-                self.prev = self.cur;
-                self.cur = tok;
-            }
-            Err(e) => {
-                dbg!(e);
+    fn declaration(&mut self) -> COMPError<()> {
+        match self.cur.ty {
+            TokenType::Var => {
+                let var_name_const_idx = self.variable()?;
 
-                self.had_error = true;
-                self.panic_mode = true;
+                if TokenType::Equal == self.cur.ty {
+                    self.move_to_next_token();
+                    // if we have an expresion that initializes the var, calculate it and put on stack
+                    self.expression(Precedence::None)?;
+                } else {
+                    // do nothing, we just made room on out var table for this one and push NIL inside
+                    self.emit_op(OpCode::NIL);
+                }
+
+                self.cur_must_be(TokenType::Semicolon)?;
+                self.emit_op(OpCode::DEFINE_GLOBAL(var_name_const_idx));
+                // tell the compiler where the var name is stored.
+
+            }
+            _ => self.statement()?,
+        }
+        Ok(())
+    }
+
+    fn statement(&mut self) -> COMPError<()> {
+        match self.cur.ty {
+            TokenType::Print => {
+                self.move_to_next_token();
+                self.expression(Precedence::None)?;
+                self.cur_must_be(TokenType::Semicolon)?;
+                self.emit_op(OpCode::PRINT);
+            }
+            // Expression statement
+            _ => {
+                self.expression(Precedence::None)?;
+                self.cur_must_be(TokenType::Semicolon)?;
+                self.emit_op(OpCode::POP);
             }
         }
-    }
-
-    fn expect_token(&mut self, ty: TokenType) -> COMPError<()> {
-        if self.cur.ty == ty {
-            self.advance();
-            Ok(())
-        } else {
-            Err(CompileError::UnexpectedToken(ty, self.cur.ty))
-        }
-    }
-
-    fn emit_op(&mut self, op: OpCode) {
-        self.chunk.add_op(op, self.scanner.line as usize);
+        Ok(())
     }
 
     fn expression(&mut self, min_prec: Precedence) -> COMPError<()> {
         use TokenType::*;
 
         // do the prefix op first
-        self.advance();
+        self.move_to_next_token();
 
         match self.prev.ty {
             Number => self.number()?,
             String => self.string()?,
             LeftParen => {
                 self.expression(Precedence::None)?;
-                self.expect_token(TokenType::RightParen)?;
+                self.cur_must_be(RightParen)?;
             }
             True | False | Nil => {
                 self.literal()?;
             }
             Minus | Bang => self.unary()?,
+            
+            Ident => {
+                let ident_ = self.scanner.token_text(self.prev)?;
+                let ident_idx = self.chunk.add_const(Value::String(ident_));
+
+                if let TokenType::Equal = self.cur.ty {
+                    self.move_to_next_token();
+                    self.expression(Precedence::None)?;
+                    self.emit_op(OpCode::SET_GLOBAL(ident_idx as u8))
+                } else {
+                    
+                    self.emit_op(OpCode::GET_GLOBAL(ident_idx as u8));
+    
+                }
+                
+            }
 
             _ => {
                 // Expression that doesn't start with a prefix op or a literal is poorly formed
@@ -134,15 +133,31 @@ impl<'a> Parser<'a> {
                 return Ok(());
             }
 
-            self.advance();
-
-            match self.prev.ty {
+            match self.cur.ty {
                 Minus | Plus | Slash | Star | EqualEqual | BangEqual | Greater | GreaterEqual
-                | LessEqual | Less => self.binary()?,
+                | LessEqual | Less => {
+                    self.move_to_next_token();
+                    self.binary()?
+                }
                 _ => break,
             }
         }
         Ok(())
+    }
+
+    fn move_to_next_token(&mut self) {
+        match self.scanner.scan_token() {
+            Ok(tok) => {
+                self.prev = self.cur;
+                self.cur = tok;
+            }
+            Err(e) => {
+                dbg!(e);
+
+                self.had_error = true;
+                self.panic_mode = true;
+            }
+        }
     }
 
     fn literal(&mut self) -> COMPError<()> {
@@ -155,6 +170,14 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
+    fn variable(&mut self) -> COMPError<ConstIdx> {
+        self.move_to_next_token();
+        self.cur_must_be(TokenType::Ident)?;
+        let ident_ = self.scanner.token_text(self.prev)?;
+        let const_idx = self.chunk.add_const(Value::String(ident_)) as ConstIdx;
+        Ok(const_idx)
+    }
+
     fn binary(&mut self) -> COMPError<()> {
         // at this point we already have the left hand side expression result on the stack
         // now we need to figure out what should we parse next. get that expression, push it on the stack
@@ -164,8 +187,11 @@ impl<'a> Parser<'a> {
         // i can gothe same way as bob did maybe i should star with that and see how i can improve from there
         // I think it's much easir to do that with some pattern matching or something inplace. no need for extra functions here
         let op = self.prev.ty;
+
+        // put RHS expression on the stach
         self.expression(op.into())?;
 
+        // apply the binary op on both expressions
         match op {
             TokenType::Plus => self.emit_op(OpCode::ADD),
             TokenType::Minus => self.emit_op(OpCode::SUB),
@@ -212,10 +238,10 @@ impl<'a> Parser<'a> {
 
     fn string(&mut self) -> COMPError<()> {
         let tok_txt = self
-        .scanner
-        .token_text(self.prev)
-        .map_err(|_| CompileError::NonASCIIChar)?;
-        
+            .scanner
+            .token_text(self.prev)
+            .map_err(|_| CompileError::NonASCIIChar)?;
+
         let const_idx = self.chunk.add_const(Value::String(tok_txt));
         self.emit_op(OpCode::CONSTANT(const_idx as u8));
         Ok(())
@@ -225,8 +251,7 @@ impl<'a> Parser<'a> {
         // for now this thing is f32 only
         let tok_txt = self
             .scanner
-            .token_text(self.prev)
-            .map_err(|_| CompileError::NonASCIIChar)?;
+            .token_text(self.prev)?;
         let num: f32 = tok_txt.parse().map_err(|_| CompileError::NonASCIIChar)?;
 
         let const_idx = self.chunk.add_const(num.into());
@@ -237,33 +262,66 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn grouping(&mut self) -> COMPError<()> {
-        self.expression(Precedence::None)?;
-        self.expect_token(TokenType::RightParen)?;
-        Ok(())
-    }
-
-    pub fn parse(&mut self) {
-        // we got a scanner and a chunk, now it's time to start writing
-        self.advance(); // get the first token for now ignore errors
-                        //for now we only want to cath an expression
-
-        while self.cur.ty != TokenType::EoF {
-            self.expression(Precedence::Assignment).unwrap();
+    fn cur_must_be(&mut self, ty: TokenType) -> COMPError<()> {
+        if self.cur.ty == ty {
+            self.move_to_next_token();
+            Ok(())
+        } else {
+            Err(CompileError::UnexpectedToken(ty, self.cur.ty, self.scanner.line))
         }
+    }
 
-        self.expect_token(TokenType::EoF).unwrap(); // finished reading the whole scanner
-        self.emit_op(OpCode::RETURN);
+    fn emit_op(&mut self, op: OpCode) {
+        self.chunk.add_op(op, self.scanner.line as usize);
+    }
+
+    pub fn init(scanner: &'a mut Scanner<'a>, chunk: &'a mut Chunk) -> Self {
+        let parser = Self {
+            cur: Token::empty(0),
+            prev: Token::empty(0),
+            had_error: false,
+            panic_mode: false,
+            scanner,
+            chunk,
+            // heap,
+        };
+        parser
     }
 }
 
-pub fn compile(source: &str) -> Chunk {
-    let mut scanner = Scanner::from_str(source).unwrap();
-    let mut chunk = Chunk::new();
-    // let mut heap = RefCell::new(Heap::init());
 
-    let mut parser = Parser::init(&mut scanner, &mut chunk); 
-    parser.parse();
 
-    chunk
+#[derive(PartialEq, PartialOrd, Debug, Clone, Copy)]
+#[repr(u8)]
+enum Precedence {
+    None,
+    Assignment, // =
+    Or,
+    And,
+    Equality,   // == !=
+    Comparison, // < > <= >=
+    Term,       // + -
+    Factor,     // * /
+    Unary,      // !, -
+    Call,       // . f()
+    Primary,
 }
+
+impl From<TokenType> for Precedence {
+    fn from(ty: TokenType) -> Self {
+        use TokenType::*;
+
+        match ty {
+            Equal => Self::Assignment,
+            Or => Self::Or,
+            And => Self::And,
+            EqualEqual | BangEqual => Self::Equality,
+            Greater | GreaterEqual | Less | LessEqual => Self::Comparison,
+            Plus | Minus => Self::Term, // what happens in unary setting with minus?
+            Star | Slash => Self::Factor,
+            Dot => Self::Call,
+            _ => Self::None,
+        }
+    }
+}
+

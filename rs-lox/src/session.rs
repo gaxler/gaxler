@@ -1,5 +1,5 @@
 
-use crate::{vm::VM, opcode::Chunk, scanner::Scanner, parser::Parser};
+use crate::{vm::VM, opcode::Chunk, scanner::Scanner, parser::Parser, errors::{COMPError, RTError}};
 
 pub type ChunkAddr = usize;
 
@@ -16,16 +16,16 @@ impl RuntimeContext {
         Self {vm, chunks: vec![]}
     }
 
-    pub fn compile(&mut self, source: &str) -> ChunkAddr {
+    pub fn compile(&mut self, source: &str) -> COMPError<ChunkAddr> {
         let mut scanner = Scanner::from_str(source).unwrap();
         let mut chunk = Chunk::new();
 
         // let mut parser = Parser::init(&mut scanner, &mut chunk, self.heap.borrow_mut());
         let mut parser = Parser::init(&mut scanner, &mut chunk);
-        parser.parse();
+        parser.parse()?;
 
         self.chunks.push(Some(chunk));
-        self.chunks.len() - 1
+        Ok(self.chunks.len() - 1)
     }
 
     pub fn get_chunk(&mut self, addr: ChunkAddr) -> Chunk {
@@ -36,12 +36,13 @@ impl RuntimeContext {
         self.chunks[addr] = Some(chunk);
     }
 
-    pub fn exec(&mut self, addr: ChunkAddr) {
+    pub fn exec(&mut self, addr: ChunkAddr) -> RTError<()> {
         let cur_chunk = self.get_chunk(addr);
         self.vm.load_chunk(cur_chunk);
-        self.vm.run().unwrap();
+        self.vm.run()?;
         let cur_chunk = self.vm.unload_chunk();
         self.put_chunk(addr, cur_chunk);
+        Ok(())
     }
 
     pub fn debug_report(&self) {

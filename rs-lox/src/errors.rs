@@ -15,8 +15,8 @@ pub enum CompileError {
     NonASCIIChar,
     #[error("Syntax error on line {line} at char {ch}")]
     SyntaxError { line: u32, ch: usize },
-    #[error("Expected Token {0:?} found Token {1:?}")]
-    UnexpectedToken(TokenType, TokenType),
+    #[error("On line {2}: Expected Token {0:?} found Token {1:?}")]
+    UnexpectedToken(TokenType, TokenType, u32),
     #[error("Constant is indexed by u8")]
     ToManyConstants,
 }
@@ -29,8 +29,6 @@ pub enum RuntimeError {
     IllegalUnaryOp(OpCode, Value),
     #[error("Op {0:?} not allowed on types {1:?} and {2:?}")]
     IllegalOp(OpCode, String, String),
-    #[error("Can't run a VM without loading a Chunk")]
-    EmptyChunk,
-    #[error("Can't convert into {0}")]
-    HeapTypeMismatch(&'static str)
+    #[error("Unknown variable {0}")]
+    UnknownVariable(String)
 }
