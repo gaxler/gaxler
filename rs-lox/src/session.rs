@@ -1,5 +1,6 @@
 
-use crate::{vm::VM, opcode::Chunk, scanner::Scanner, parser::Parser, errors::{COMPError, RTError}};
+use crate::{vm::VM, opcode::Chunk,  parser::Parser, errors::{COMPError, RTError}};
+use lang::Scanner;
 
 pub type ChunkAddr = usize;
 
@@ -39,10 +40,11 @@ impl RuntimeContext {
     pub fn exec(&mut self, addr: ChunkAddr) -> RTError<()> {
         let cur_chunk = self.get_chunk(addr);
         self.vm.load_chunk(cur_chunk);
-        self.vm.run()?;
+        let res = self.vm.run();
+        // make sure to put the chunk back even if the execution fails
         let cur_chunk = self.vm.unload_chunk();
         self.put_chunk(addr, cur_chunk);
-        Ok(())
+        res
     }
 
     pub fn debug_report(&self) {

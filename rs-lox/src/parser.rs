@@ -2,10 +2,10 @@
 use crate::{
     errors::{COMPError, CompileError},
     opcode::{Chunk, ConstIdx, OpCode},
-    scanner::{Scanner, Token, TokenType},
     value::Value,
 };
 
+use lang::{TokenType, Precedence, Token, Scanner};
 
 pub struct Parser<'a> {
     cur: Token,
@@ -112,10 +112,7 @@ impl<'a> Parser<'a> {
 
             _ => {
                 // Expression that doesn't start with a prefix op or a literal is poorly formed
-                return Err(CompileError::SyntaxError {
-                    line: self.scanner.line,
-                    ch: self.scanner.start_pos,
-                });
+                return Err(CompileError::syntax(self.scanner.ascii_chars, "Bad expression",self.scanner.start_pos, self.scanner.cur_pos));
             }
         }
 
@@ -267,7 +264,9 @@ impl<'a> Parser<'a> {
             self.move_to_next_token();
             Ok(())
         } else {
-            Err(CompileError::UnexpectedToken(ty, self.cur.ty, self.scanner.line))
+            Err(
+                CompileError::unexpected(self.scanner.ascii_chars, self.cur.ty, ty, self.scanner.start_pos, self.scanner.cur_pos)
+            )
         }
     }
 
@@ -288,40 +287,3 @@ impl<'a> Parser<'a> {
         parser
     }
 }
-
-
-
-#[derive(PartialEq, PartialOrd, Debug, Clone, Copy)]
-#[repr(u8)]
-enum Precedence {
-    None,
-    Assignment, // =
-    Or,
-    And,
-    Equality,   // == !=
-    Comparison, // < > <= >=
-    Term,       // + -
-    Factor,     // * /
-    Unary,      // !, -
-    Call,       // . f()
-    Primary,
-}
-
-impl From<TokenType> for Precedence {
-    fn from(ty: TokenType) -> Self {
-        use TokenType::*;
-
-        match ty {
-            Equal => Self::Assignment,
-            Or => Self::Or,
-            And => Self::And,
-            EqualEqual | BangEqual => Self::Equality,
-            Greater | GreaterEqual | Less | LessEqual => Self::Comparison,
-            Plus | Minus => Self::Term, // what happens in unary setting with minus?
-            Star | Slash => Self::Factor,
-            Dot => Self::Call,
-            _ => Self::None,
-        }
-    }
-}
-

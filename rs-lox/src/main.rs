@@ -1,7 +1,7 @@
 mod errors;
 mod opcode;
 mod parser;
-mod scanner;
+
 mod vm;
 mod value;
 mod session;
@@ -12,6 +12,8 @@ use session::RuntimeContext;
 use std::env;
 
 use crate::value::Value;
+
+use lang::Precedence;
 
 
 fn shitcode() {
@@ -31,7 +33,7 @@ fn interpret(source: &str, debug: bool) {
     let ch_id = match runtime.compile(source) {
         Ok(idx) => idx,
         Err(e) => {
-            println!(" Error: [{}]", e);
+            println!(" Error: [\n\t {} \n]", e);
             return;
         }
         
@@ -39,7 +41,7 @@ fn interpret(source: &str, debug: bool) {
     match runtime.exec(ch_id) {
         Ok(_) => {},
         Err(e) => {
-            println!(" Error: [{}]", e);
+            println!(" Error: [ \n\t {} \n ]", e);
             return; 
         }
     }
@@ -82,7 +84,7 @@ fn repl() {
                         Err(e) => println!("  Err: [{}]", e),
                         Ok(idx) => {
                             if let Err(e) = runtime.exec(idx) {
-                                println!("  Err: [{}]", e); 
+                                println!("  Err: [\n\t {} \n]", e); 
                             }
                         },
                     }

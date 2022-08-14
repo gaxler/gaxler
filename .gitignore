@@ -11,3 +11,4 @@ Cargo.lock
 rs-lox/target/*
 systems/target/*
 arithmetic-compression/target/*
+rs-lox/lang/target/*

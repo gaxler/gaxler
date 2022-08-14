@@ -1,7 +1,7 @@
 use std::{borrow::Borrow, cell::RefCell, mem::MaybeUninit};
 
 use crate::{
-    errors::{COMPError, RTError, RuntimeError},
+    errors::{RTError, RuntimeError},
     opcode::{Chunk, ConstIdx, OpCode, VarStore},
     value::Value,
 };

@@ -1,6 +1,7 @@
-use std::{fmt, hash::Hash, str::FromStr};
+use std::{fmt, str::FromStr};
 
 use crate::{opcode::OpCode};
+
 #[derive(Clone, Debug)]
 #[repr(u8)]
 /// Represents dynamic values in Lox. 

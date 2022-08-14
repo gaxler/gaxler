@@ -6,20 +6,22 @@ use thiserror::Error;
 use crate::{
     opcode::OpCode,
     value::Value,
-    scanner::TokenType,
 };
 
-#[derive(Debug, Error)]
-pub enum CompileError {
-    #[error("Source code must be ASCII chars only")]
-    NonASCIIChar,
-    #[error("Syntax error on line {line} at char {ch}")]
-    SyntaxError { line: u32, ch: usize },
-    #[error("On line {2}: Expected Token {0:?} found Token {1:?}")]
-    UnexpectedToken(TokenType, TokenType, u32),
-    #[error("Constant is indexed by u8")]
-    ToManyConstants,
-}
+
+pub use lang::CompileError;
+
+// #[derive(Debug, Error)]
+// pub enum CompileError {
+//     #[error("Source code must be ASCII chars only")]
+//     NonASCIIChar,
+//     #[error("Syntax error on line {line} at char {ch}")]
+//     SyntaxError { line: u32, ch: usize },
+//     #[error("On line {2}: Expected Token {0:?} found Token {1:?}")]
+//     UnexpectedToken(TokenType, TokenType, u32),
+//     #[error("Constant is indexed by u8")]
+//     ToManyConstants,
+// }
 
 #[derive(Debug, Error)]
 pub enum RuntimeError {
