@@ -2,11 +2,14 @@ use std::{borrow::Borrow, cell::RefCell, mem::MaybeUninit};
 
 use crate::{
     errors::{RTError, RuntimeError},
-    opcode::{Chunk, ConstIdx, OpCode, VarStore},
-    value::Value,
+    stores::{Chunk, VarStore},
 };
 
-const STACK_MAX: usize = 256;
+
+use lang::{OpCode, ConstIdx};
+use values::Value;
+
+const STACK_MAX: usize = u8::MAX as usize + 1;
 
 pub struct Stack {
     stack: [Value; STACK_MAX],
@@ -15,6 +18,8 @@ pub struct Stack {
 
 impl Stack {
     fn init() -> Self {
+        
+        // SAFETY: init an array with non-copy value. 
         let empty_stack = unsafe {
             let mut tmp = MaybeUninit::<[Value; STACK_MAX]>::uninit().assume_init();
 

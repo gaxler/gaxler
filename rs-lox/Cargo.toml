@@ -7,10 +7,14 @@ edition = "2021"
 
 [workspace]
 members = [
-    "lang"
+    "lang",
+    "compiler",
+    "values"
 ]
 
 [dependencies]
 thiserror = "1.0.32"
 linenoise-rust = "0.2.1"
 lang = {path ="lang"}
+compiler = {path ="compiler"}
+values = {path ="values"}

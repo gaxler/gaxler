@@ -1,3 +1,7 @@
-var b;
-b = 10;
-print b;
+{
+    print 5;
+    {
+        print "deep";
+    }
+}
+

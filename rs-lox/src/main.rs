@@ -1,9 +1,8 @@
 mod errors;
-mod opcode;
+mod stores;
 mod parser;
 
 mod vm;
-mod value;
 mod session;
 
 use std::fs;
@@ -11,13 +10,12 @@ use std::mem::{size_of, align_of};
 use session::RuntimeContext;
 use std::env;
 
-use crate::value::Value;
 
-use lang::Precedence;
+use values::Value;
+use lang::OpCode;
 
 
 fn shitcode() {
-    use opcode::*;
 
     println!("OpCode: size is {} bytes", size_of::<OpCode>());
     println!("Value: size is {} bytes, align is {} bytes", size_of::<Value>(), align_of::<Value>());

@@ -1,11 +1,13 @@
-
 use crate::{
     errors::{COMPError, CompileError},
-    opcode::{Chunk, ConstIdx, OpCode},
-    value::Value,
+    stores::Chunk,
 };
 
-use lang::{TokenType, Precedence, Token, Scanner};
+use values::Value;
+
+use compiler::{Compiler, Local};
+use lang::{ConstIdx, OpCode};
+use lang::{Precedence, Scanner, Token, TokenType};
 
 pub struct Parser<'a> {
     cur: Token,
@@ -14,7 +16,7 @@ pub struct Parser<'a> {
     panic_mode: bool,
     scanner: &'a mut Scanner<'a>,
     chunk: &'a mut Chunk,
-    // heap: RefMut<'a, Heap>
+    compiler: Compiler,
 }
 
 impl<'a> Parser<'a> {
@@ -51,7 +53,6 @@ impl<'a> Parser<'a> {
                 self.cur_must_be(TokenType::Semicolon)?;
                 self.emit_op(OpCode::DEFINE_GLOBAL(var_name_const_idx));
                 // tell the compiler where the var name is stored.
-
             }
             _ => self.statement()?,
         }
@@ -66,6 +67,11 @@ impl<'a> Parser<'a> {
                 self.cur_must_be(TokenType::Semicolon)?;
                 self.emit_op(OpCode::PRINT);
             }
+            TokenType::LeftBrace => {
+                self.compiler.begin_scope();
+                self.block()?;
+                self.compiler.end_scope();
+            }
             // Expression statement
             _ => {
                 self.expression(Precedence::None)?;
@@ -73,6 +79,30 @@ impl<'a> Parser<'a> {
                 self.emit_op(OpCode::POP);
             }
         }
+        Ok(())
+    }
+
+    fn block(&mut self) -> COMPError<()> {
+        println!("{}", self.compiler);
+        self.move_to_next_token();
+        loop {
+            match self.cur.ty {
+                TokenType::RightBrace => break,
+                TokenType::EoF => {
+                    return Err(CompileError::syntax(
+                        self.scanner.ascii_chars,
+                        "EoF in without block close",
+                        self.scanner.start_pos,
+                        self.scanner.cur_pos,
+                    ));
+                }
+
+                _ => {
+                    self.declaration()?;
+                }
+            }
+        }
+        self.cur_must_be(TokenType::RightBrace)?;
         Ok(())
     }
 
@@ -93,7 +123,7 @@ impl<'a> Parser<'a> {
                 self.literal()?;
             }
             Minus | Bang => self.unary()?,
-            
+
             Ident => {
                 let ident_ = self.scanner.token_text(self.prev)?;
                 let ident_idx = self.chunk.add_const(Value::String(ident_));
@@ -103,16 +133,18 @@ impl<'a> Parser<'a> {
                     self.expression(Precedence::None)?;
                     self.emit_op(OpCode::SET_GLOBAL(ident_idx as u8))
                 } else {
-                    
                     self.emit_op(OpCode::GET_GLOBAL(ident_idx as u8));
-    
                 }
-                
             }
 
             _ => {
                 // Expression that doesn't start with a prefix op or a literal is poorly formed
-                return Err(CompileError::syntax(self.scanner.ascii_chars, "Bad expression",self.scanner.start_pos, self.scanner.cur_pos));
+                return Err(CompileError::syntax(
+                    self.scanner.ascii_chars,
+                    "Bad expression",
+                    self.scanner.start_pos,
+                    self.scanner.cur_pos,
+                ));
             }
         }
 
@@ -246,9 +278,7 @@ impl<'a> Parser<'a> {
 
     fn number(&mut self) -> COMPError<()> {
         // for now this thing is f32 only
-        let tok_txt = self
-            .scanner
-            .token_text(self.prev)?;
+        let tok_txt = self.scanner.token_text(self.prev)?;
         let num: f32 = tok_txt.parse().map_err(|_| CompileError::NonASCIIChar)?;
 
         let const_idx = self.chunk.add_const(num.into());
@@ -264,9 +294,13 @@ impl<'a> Parser<'a> {
             self.move_to_next_token();
             Ok(())
         } else {
-            Err(
-                CompileError::unexpected(self.scanner.ascii_chars, self.cur.ty, ty, self.scanner.start_pos, self.scanner.cur_pos)
-            )
+            Err(CompileError::unexpected(
+                self.scanner.ascii_chars,
+                self.cur.ty,
+                ty,
+                self.scanner.start_pos,
+                self.scanner.cur_pos,
+            ))
         }
     }
 
@@ -275,6 +309,8 @@ impl<'a> Parser<'a> {
     }
 
     pub fn init(scanner: &'a mut Scanner<'a>, chunk: &'a mut Chunk) -> Self {
+        let compiler = Compiler::init();
+
         let parser = Self {
             cur: Token::empty(0),
             prev: Token::empty(0),
@@ -282,7 +318,7 @@ impl<'a> Parser<'a> {
             panic_mode: false,
             scanner,
             chunk,
-            // heap,
+            compiler,
         };
         parser
     }

@@ -1,6 +1,6 @@
 use std::{fmt, str::FromStr};
 
-use crate::{opcode::OpCode};
+use lang::OpCode;
 
 #[derive(Clone, Debug)]
 #[repr(u8)]
