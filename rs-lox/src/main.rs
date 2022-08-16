@@ -1,5 +1,4 @@
 mod errors;
-mod stores;
 mod parser;
 
 mod vm;

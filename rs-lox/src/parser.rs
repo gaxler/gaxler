@@ -1,6 +1,4 @@
-use crate::{
-    errors::{COMPError, CompileError},
-};
+use crate::errors::{COMPError, CompileError};
 
 use values::Value;
 
@@ -16,7 +14,7 @@ pub struct Parser<'a> {
     panic_mode: bool,
     scanner: &'a mut Scanner<'a>,
     chunk: &'a mut Chunk,
-    compiler: Compiler<'a>,
+    compiler: Compiler,
 }
 
 impl<'a> Parser<'a> {
@@ -39,7 +37,9 @@ impl<'a> Parser<'a> {
     fn declaration(&mut self) -> COMPError<()> {
         match self.cur.ty {
             TokenType::Var => {
-                let var_name_const_idx = self.variable()?;
+                let ident_ = self.get_ident()?;
+
+                // let var_name_const_idx = self.global_variable()?;
 
                 if TokenType::Equal == self.cur.ty {
                     self.move_to_next_token();
@@ -51,13 +51,16 @@ impl<'a> Parser<'a> {
                 }
 
                 if self.compiler.local_scope() {
-                    let ident_ = self.scanner.token_txt_str(self.prev)?;
-                    self.compiler.local_exists(ident_).expect("TODO: proper handling of double def of local variable ");
+                    self.compiler
+                        .local_exists(&ident_)
+                        .expect("TODO: proper handling of double def of local variable ");
                     self.compiler.add_local(ident_);
                     // at this point the variable is already on the stack and is going to be used in the scope
-                    // it was deined in (or deeper scope) 
+                    // it was deined in (or deeper scope)
                 } else {
-                    self.emit_op(OpCode::DEFINE_GLOBAL(var_name_const_idx));
+                    let const_idx =
+                        self.chunk.add_const(Value::String(ident_.to_string())) as ConstIdx;
+                    self.emit_op(OpCode::DEFINE_GLOBAL(const_idx));
                 }
                 self.cur_must_be(TokenType::Semicolon)?;
             }
@@ -129,23 +132,10 @@ impl<'a> Parser<'a> {
                 self.expression(Precedence::None)?;
                 self.cur_must_be(RightParen)?;
             }
-            True | False | Nil => {
-                self.literal()?;
-            }
+            True | False | Nil => self.literal()?,
             Minus | Bang => self.unary()?,
 
-            Ident => {
-                let ident_ = self.scanner.token_text(self.prev)?;
-                let ident_idx = self.chunk.add_const(Value::String(ident_));
-
-                if let TokenType::Equal = self.cur.ty {
-                    self.move_to_next_token();
-                    self.expression(Precedence::None)?;
-                    self.emit_op(OpCode::SET_GLOBAL(ident_idx as u8))
-                } else {
-                    self.emit_op(OpCode::GET_GLOBAL(ident_idx as u8));
-                }
-            }
+            Ident => self.identifier()?,
 
             _ => {
                 // Expression that doesn't start with a prefix op or a literal is poorly formed
@@ -199,6 +189,32 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn identifier(&mut self) -> COMPError<()> {
+        let ident_ = self.scanner.token_text(self.prev)?;
+        let is_local = self.compiler.find_local(&ident_);
+
+        if let TokenType::Equal = self.cur.ty {
+            self.move_to_next_token();
+            self.expression(Precedence::None)?;
+            match is_local {
+                Some(slot) => self.emit_op(OpCode::SET_LOCAL(slot)),
+                None => {
+                    let ident_idx = self.chunk.add_const(Value::String(ident_)) as u8;
+                    self.emit_op(OpCode::SET_GLOBAL(ident_idx))
+                }
+            }
+        } else {
+            match is_local {
+                Some(slot) => self.emit_op(OpCode::GET_LOCAL(slot)),
+                None => {
+                    let ident_idx = self.chunk.add_const(Value::String(ident_)) as u8;
+                    self.emit_op(OpCode::GET_GLOBAL(ident_idx))
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn literal(&mut self) -> COMPError<()> {
         match self.prev.ty {
             TokenType::True => self.emit_op(OpCode::TRUE),
@@ -209,10 +225,13 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn variable(&mut self) -> COMPError<ConstIdx> {
+    fn get_ident(&mut self) -> COMPError<String> {
         self.move_to_next_token();
         self.cur_must_be(TokenType::Ident)?;
-        let ident_ = self.scanner.token_text(self.prev)?;
+        Ok(self.scanner.token_txt_str(self.prev)?.to_string())
+    }
+
+    fn global_variable(&mut self, ident_: String) -> COMPError<ConstIdx> {
         let const_idx = self.chunk.add_const(Value::String(ident_)) as ConstIdx;
         Ok(const_idx)
     }

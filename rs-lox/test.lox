@@ -1,9 +1,11 @@
 {
-    var a = 5;
+    var a = 1;
     {
-        var b = 5;
-        var d = 4;
+        var b = 2;
+        var d = 3;
         print "deep";
+        print b + d;
     }
+    
 }
 

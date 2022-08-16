@@ -155,6 +155,18 @@ impl VM {
                     let val = val.unwrap().clone();
                     self.push(val);
                 }
+                GET_LOCAL(slot) => {
+                    // expressions leave stuff on the stack, but we don't allow naked expression anymore
+                    // variable declaration stay in the stack. so we either have variables, or we are in the middle of an expression.
+                    // in that case any changes to the stack happen after the locals and doesn't affect locals oreder.
+                    let val = self
+                        .stack
+                        .borrow_mut()
+                        .peek_at(slot as usize)
+                        .expect("Local Slot in invalid stack location???")
+                        .clone();
+                    self.push(val);
+                }
                 SET_GLOBAL(ident_idx) => {
                     let ident_ = self._read_ident(ident_idx);
                     if !self.globals.contains(&ident_) {
@@ -162,6 +174,15 @@ impl VM {
                     }
 
                     self.globals.put(ident_, self.peek()?);
+                }
+                SET_LOCAL(slot) => {
+                    // we see equal after an identifier, we evaluate and expression (result on stack) and call the assignemnt OP
+                    let val = self.pop();
+                    *self
+                        .stack
+                        .borrow_mut()
+                        .peek_at(slot as usize)
+                        .expect("Local Slot in invalid stack location???") = val;
                 }
             }
             self.ip += 1;
@@ -247,7 +268,7 @@ impl VM {
     }
 
     fn debug_dump(&mut self) {
-        if let Some(chunk) = self.chunk.take() {
+        if let Some(chunk) = self.chunk.clone() {
             println!(" ===== Constants =====");
             for cons in chunk.consts {
                 println!(" -> {}", cons);

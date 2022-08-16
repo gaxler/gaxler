@@ -64,6 +64,10 @@ impl Stack {
 
         Some(self.stack[self.top - 1].borrow())
     }
+    
+    pub fn peek_at(&mut self, idx: usize) -> Option<&mut Value>{
+        self.stack.get_mut(idx)
+    }
 
     pub fn show_stack(&self) {
         println!("Stack Values:");

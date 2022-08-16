@@ -24,6 +24,8 @@ pub enum OpCode {
     POP,
     DEFINE_GLOBAL(ConstIdx),
     GET_GLOBAL(ConstIdx),
+    GET_LOCAL(ConstIdx),
     SET_GLOBAL(ConstIdx),
+    SET_LOCAL(ConstIdx),
 }
 

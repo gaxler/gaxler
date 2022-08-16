@@ -2,7 +2,7 @@ use lang::{OpCode, ConstIdx};
 
 use crate::Value;
 
-
+#[derive(Debug, Clone)]
 pub struct Chunk {
     pub ops: Vec<OpCode>,
     pub consts: Vec<Value>,
