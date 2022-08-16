@@ -1,8 +1,12 @@
 # Crafting Thoughts & TILs
 Following [Crafting Interpreters](https://craftinginterpreters.com/) in Rust. This is nice, I have to rethink how I implement everything, since original is in C and Rust provide much more convenience on one hand and challenges with the safety constraints. This is great both for understanding Rust and how to craft interpreters.
 
-At first I aim to just make the thing run to spec. Later on will try to optimize some parts of it.
+At first I aim to make the thing run to spec. Later on will try to optimize some parts of it.
+## Aug 16, 2022
+* There is no reason to try and mix &str and String when I plan eventually to refactor the way I handle identifiers. Switched everything to string cloning and now local vars work.
 ## Aug 15, 2022
+* got stuck on fixing the identifier global local confusion. Its too late anyway
+* placed value stores (Stack, VarStore, Chunk) in the values crate. This crate provides services to the runtime and compile time. 
 * how should I split the interpreter to crates? Best would be crates that provide services to others. So the `lang` crate is great since it doesn’t need anything and provides tokens and scanner to everyone else. but everyone else need the lang crate. So I guess that I need to avoid circular dependencies, that will be the sign that I did something wrong. compiler crate will have the parser and compiler in there. 
 * I skip blank spaces when tokenizing, this makes my error citation code fail. Need to keep track of blanks spotted so far in the scanner.
 ## Aug 14, 2022
@@ -22,3 +26,4 @@ At first I aim to just make the thing run to spec. Later on will try to optimize
 * **Representing Heap Values**
 	* In C you have to allocate memory for strings on the heap but in Rust, String does that for me and gets me back a pointer, length and capacity. 
 	* I simply use rust’s heap instead of redoing the heap allocation myself. I might pay with perf on this. But it’s much simpler and leaves room for future optimizations
+	* Some [experiments](https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=d4371f3475b6a005a3392ef8687f52e6) on how to keep string as a raw pointer
