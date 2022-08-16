@@ -1,6 +1,7 @@
 
-use crate::{vm::VM, stores::Chunk,  parser::Parser, errors::{COMPError, RTError}};
+use crate::{vm::VM, parser::Parser, errors::{COMPError, RTError}};
 use lang::Scanner;
+use values::Chunk;
 
 pub type ChunkAddr = usize;
 

@@ -1,73 +1,27 @@
-use std::{borrow::Borrow, cell::RefCell, mem::MaybeUninit};
+use std::cell::RefCell;
 
-use crate::{
-    errors::{RTError, RuntimeError},
-    stores::{Chunk, VarStore},
-};
+use crate::errors::{RTError, RuntimeError};
 
-
-use lang::{OpCode, ConstIdx};
+use lang::{ConstIdx, OpCode};
 use values::Value;
+use values::{Chunk, Stack, VarStore};
 
-const STACK_MAX: usize = u8::MAX as usize + 1;
-
-pub struct Stack {
-    stack: [Value; STACK_MAX],
-    top: usize,
+fn stack_pop(stack: &mut Stack) -> RTError<Value> {
+    stack
+        .pop()
+        .map_err(|e| RuntimeError::StackError(format!("{}", e)))
 }
 
-impl Stack {
-    fn init() -> Self {
-        
-        // SAFETY: init an array with non-copy value. 
-        let empty_stack = unsafe {
-            let mut tmp = MaybeUninit::<[Value; STACK_MAX]>::uninit().assume_init();
-
-            for v in tmp.iter_mut() {
-                *v = Value::Nil;
-            }
-            tmp
-        };
-
-        Self {
-            stack: empty_stack,
-            top: 0,
-        }
-    }
-
-    pub fn push(&mut self, val: Value) -> RTError<()> {
-        if self.top > self.stack.len() - 1 {
-            return Err(RuntimeError::StackError("Oveflow".to_string()));
-        }
-
-        self.stack[self.top] = val;
-        self.top += 1;
-        Ok(())
-    }
-
-    pub fn pop(&mut self) -> RTError<Value> {
-        if self.top <= 0 {
-            return Err(RuntimeError::StackError("Underflow".to_string()));
-        }
-
-        self.top -= 1;
-        let pidx = self.top;
-        let out_val = std::mem::replace(&mut self.stack[pidx], Value::Nil);
-        Ok(out_val)
-    }
-
-    pub fn peek(&self) -> Option<&Value> {
-        if self.top == 0 {
-            return None;
-        }
-        Some(self.stack[self.top - 1].borrow())
-    }
+fn stack_push(val: Value, stack: &mut Stack) -> RTError<()> {
+    stack
+        .push(val)
+        .map_err(|e| RuntimeError::StackError(format!("{}", e)))
 }
 
 fn exec_unary(op: OpCode, stack: &mut Stack) -> RTError<()> {
     use OpCode::*;
 
-    let unary_inp = stack.pop()?;
+    let unary_inp = stack_pop(stack)?;
 
     let unary_result = match op {
         NEGATE => match unary_inp {
@@ -86,7 +40,7 @@ fn exec_unary(op: OpCode, stack: &mut Stack) -> RTError<()> {
         _ => panic!("Not a unary op!!"),
     };
 
-    stack.push(unary_result)?;
+    stack_push(unary_result, stack)?;
 
     Ok(())
 }
@@ -94,8 +48,8 @@ fn exec_unary(op: OpCode, stack: &mut Stack) -> RTError<()> {
 fn exec_binary(op: OpCode, stack: &mut Stack) -> Result<(), RuntimeError> {
     use OpCode::*;
 
-    let v2 = stack.pop()?;
-    let v1 = stack.pop()?;
+    let v2 = stack_pop(stack)?;
+    let v1 = stack_pop(stack)?;
 
     // clone those is cheap
     let dbg_vals = (v1.clone(), v2.clone());
@@ -118,7 +72,9 @@ fn exec_binary(op: OpCode, stack: &mut Stack) -> Result<(), RuntimeError> {
         return Err(RuntimeError::IllegalOp(op, dbg_v1, dbg_v2));
     }
 
-    stack.push(res)?;
+    stack
+        .push(res)
+        .map_err(|e| RuntimeError::StackError(format!("{}", e)))?;
     Ok(())
 }
 
@@ -211,16 +167,7 @@ impl VM {
             self.ip += 1;
         }
         if self.debug {
-            let top = self.stack.borrow().top;
-            let stack = self.stack.borrow().stack.to_vec();
-            print!(" Stack: [ ");
-            for (idx, s) in stack.iter().cloned().enumerate() {
-                print!("{:?} ", s);
-                if idx >= top {
-                    break;
-                }
-            }
-            println!(" ... ]");
+            println!("{}", self.stack.borrow());
         }
         // clear chunk
         Ok(())
@@ -286,15 +233,7 @@ impl VM {
     }
 
     pub fn show_stack(&self) {
-        println!("Stack Values:");
-        println!("==========");
-        for (idx, v) in self.stack.borrow().stack.iter().enumerate() {
-            match v {
-                Value::Nil => continue,
-                e => println!(" loc {} | {}", idx, *e),
-            }
-        }
-        println!("==========");
+        self.stack.borrow().show_stack();
     }
 
     fn _read_ident(&self, ident_: ConstIdx) -> String {

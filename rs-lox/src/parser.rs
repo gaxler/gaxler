@@ -1,6 +1,5 @@
 use crate::{
     errors::{COMPError, CompileError},
-    stores::Chunk,
 };
 
 use values::Value;
@@ -8,6 +7,7 @@ use values::Value;
 use compiler::{Compiler, Local};
 use lang::{ConstIdx, OpCode};
 use lang::{Precedence, Scanner, Token, TokenType};
+use values::Chunk;
 
 pub struct Parser<'a> {
     cur: Token,
