@@ -1,6 +1,8 @@
 {
-    print 5;
+    var a = 5;
     {
+        var b = 5;
+        var d = 4;
         print "deep";
     }
 }

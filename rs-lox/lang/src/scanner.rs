@@ -1,4 +1,4 @@
-use std::{iter::Peekable, str::Chars};
+use std::{iter::Peekable, str::Chars, error};
 
 use crate::{utils::cite_span, Token, TokenType};
 use thiserror::Error;
@@ -123,6 +123,12 @@ impl<'a> Scanner<'a> {
     pub fn token_text(&self, tok: Token) -> COMPError<String> {
         let chars = self.ascii_chars[tok.start_pos..(tok.start_pos + tok.len)].to_vec();
         String::from_utf8(chars).map_err(|_| CompileError::NonASCIIChar)
+    }
+
+    pub fn token_txt_str(&self, tok: Token) -> COMPError<&'a str> {
+
+        let chars = &self.ascii_chars[tok.start_pos..(tok.start_pos + tok.len)];
+        std::str::from_utf8(chars).map_err(|_| CompileError::NonASCIIChar)
     }
 
     fn make_token(&self, tok_type: TokenType) -> Token {

@@ -46,7 +46,7 @@ impl Stack {
     }
 
     pub fn pop(&mut self) -> RTError<Value> {
-        if self.top == 0 {
+        if self.top <= 0 {
             return Err(RuntimeError::StackError("Underflow".to_string()));
         }
 

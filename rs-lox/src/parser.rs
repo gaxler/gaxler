@@ -16,7 +16,7 @@ pub struct Parser<'a> {
     panic_mode: bool,
     scanner: &'a mut Scanner<'a>,
     chunk: &'a mut Chunk,
-    compiler: Compiler,
+    compiler: Compiler<'a>,
 }
 
 impl<'a> Parser<'a> {
@@ -50,9 +50,16 @@ impl<'a> Parser<'a> {
                     self.emit_op(OpCode::NIL);
                 }
 
+                if self.compiler.local_scope() {
+                    let ident_ = self.scanner.token_txt_str(self.prev)?;
+                    self.compiler.local_exists(ident_).expect("TODO: proper handling of double def of local variable ");
+                    self.compiler.add_local(ident_);
+                    // at this point the variable is already on the stack and is going to be used in the scope
+                    // it was deined in (or deeper scope) 
+                } else {
+                    self.emit_op(OpCode::DEFINE_GLOBAL(var_name_const_idx));
+                }
                 self.cur_must_be(TokenType::Semicolon)?;
-                self.emit_op(OpCode::DEFINE_GLOBAL(var_name_const_idx));
-                // tell the compiler where the var name is stored.
             }
             _ => self.statement()?,
         }
@@ -70,6 +77,10 @@ impl<'a> Parser<'a> {
             TokenType::LeftBrace => {
                 self.compiler.begin_scope();
                 self.block()?;
+
+                while self.compiler.should_pop_local() {
+                    self.emit_op(OpCode::POP);
+                }
                 self.compiler.end_scope();
             }
             // Expression statement
@@ -83,7 +94,6 @@ impl<'a> Parser<'a> {
     }
 
     fn block(&mut self) -> COMPError<()> {
-        println!("{}", self.compiler);
         self.move_to_next_token();
         loop {
             match self.cur.ty {
@@ -91,7 +101,7 @@ impl<'a> Parser<'a> {
                 TokenType::EoF => {
                     return Err(CompileError::syntax(
                         self.scanner.ascii_chars,
-                        "EoF in without block close",
+                        "EoF without block close",
                         self.scanner.start_pos,
                         self.scanner.cur_pos,
                     ));
