@@ -60,7 +60,6 @@ impl Stack {
         if self.top == 0 {
             return None;
         }
-
         Some(self.stack[self.top - 1].borrow())
     }
 }
