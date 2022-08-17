@@ -77,6 +77,25 @@ impl<'a> Parser<'a> {
                 self.cur_must_be(TokenType::Semicolon)?;
                 self.emit_op(OpCode::PRINT);
             }
+            TokenType::If => {
+                self.move_to_next_token();
+                self.cur_must_be(TokenType::LeftParen)?;
+                self.expression(Precedence::None)?;
+                self.cur_must_be(TokenType::RightParen)?;
+
+                // here need to read the conditioin an decide where to next
+                // the should be a true block and a false block
+                // the at the end of the true block there needs to be a jump to skip the else block
+                // so i need a way to follow the chunk size
+                // using Chunk len should do the trick
+                let true_block_ip = self.chunk.count();
+                self.emit_op(OpCode::JUMP_IF_FALSE(0xFF));
+                self.statement()?;
+                let end_of_true = self.chunk.count();
+                self.chunk
+                    .patch_op(OpCode::JUMP_IF_FALSE(end_of_true), true_block_ip);
+            }
+
             TokenType::LeftBrace => {
                 self.compiler.begin_scope();
                 self.block()?;

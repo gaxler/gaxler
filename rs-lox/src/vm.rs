@@ -282,7 +282,7 @@ impl VM {
 pub fn disassemble_op(chunk: &Chunk, offset: usize) {
     use OpCode::*;
     print!("{:04} ", offset);
-    let op = &chunk.ops[offset];
+    let op = chunk.read_op(offset);
     let line = &chunk.line_nums[offset];
     if offset > 0 && line == &chunk.line_nums[offset - 1] {
         print!("  |   ");

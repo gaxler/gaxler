@@ -4,7 +4,7 @@ use crate::Value;
 
 #[derive(Debug, Clone)]
 pub struct Chunk {
-    pub ops: Vec<OpCode>,
+    ops: Vec<OpCode>,
     pub consts: Vec<Value>,
     /// source code line that got the opcode from
     pub line_nums: Vec<usize>,
@@ -42,5 +42,9 @@ impl Chunk {
 
     pub fn read_const(&self, addr: ConstIdx) -> &Value {
         &self.consts[addr as usize]
+    }
+    
+    pub fn patch_op(&mut self, op: OpCode, ip: usize) {
+        self.ops[ip] = op;
     }
 }
