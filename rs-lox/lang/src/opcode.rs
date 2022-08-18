@@ -20,6 +20,8 @@ pub enum OpCode {
     SUB,
     MUL,
     DIV,
+    AND,
+    OR,
 
     PRINT,
     POP,

@@ -62,6 +62,8 @@ fn exec_binary(op: OpCode, stack: &mut Stack) -> Result<(), RuntimeError> {
         EQUAL => v1.eq(v2),
         GREATER => v1.greater(v2),
         LESS => v2.greater(v1),
+        AND => v1.and(v2),
+        OR => v1.or(v2),
         _ => panic!("Non Binary!!"),
     };
 
@@ -127,7 +129,7 @@ impl VM {
                     }
                 }
 
-                ADD | SUB | MUL | DIV | LESS | GREATER | EQUAL => {
+                ADD | SUB | MUL | DIV | LESS | GREATER | EQUAL | AND | OR => {
                     let mut s = self.stack.borrow_mut();
                     exec_binary(op, &mut s).unwrap();
                 }

@@ -168,7 +168,7 @@ impl<'a> Parser<'a> {
 
             match self.cur.ty {
                 Minus | Plus | Slash | Star | EqualEqual | BangEqual | Greater | GreaterEqual
-                | LessEqual | Less => {
+                | LessEqual | Less | And | Or => {
                     self.move_to_next_token();
                     self.binary()?
                 }
@@ -235,6 +235,15 @@ impl<'a> Parser<'a> {
         Ok(self.scanner.token_txt_str(self.prev)?.to_string())
     }
 
+    fn _dbg(&self, tok: Token) {
+        let a = CompileError::syntax(
+            self.scanner.ascii_chars,
+            "dbg",
+            tok.start_pos,
+            tok.start_pos + tok.len,
+        );
+        println!("{}", a);
+    }
     fn if_else(&mut self) -> COMPError<()> {
         self.move_to_next_token();
         self.cur_must_be(TokenType::LeftParen)?;
@@ -248,31 +257,31 @@ impl<'a> Parser<'a> {
         // using Chunk len should do the trick
         let true_block_ip = self.chunk.count();
         self.emit_op(OpCode::JUMP_IF_FALSE(0xFFFF));
+        let before_then = dbg!((self.prev, self.cur));
         self.statement()?;
+        
         // we need to patch something here, in case this is true
         let mut end_of_true = self.chunk.count();
 
         if self.cur.ty == TokenType::Else {
-            self.move_to_next_token(); 
+            self.move_to_next_token();
             self.emit_op(OpCode::JUMP(0xFFFF));
             // else statement
             self.statement()?;
-            self.move_to_next_token();
             let end_of_false = self.chunk.count();
             // go to the jump op and fix it
-            self.chunk.patch_op(OpCode::JUMP(end_of_false as InstructAddr), end_of_true);
+            self.chunk
+                .patch_op(OpCode::JUMP(end_of_false as InstructAddr), end_of_true);
             // add the extra op we got from the else clause jump
             end_of_true += 1;
-        }; 
+        };
 
         self.chunk.patch_op(
             OpCode::JUMP_IF_FALSE(end_of_true as InstructAddr),
             true_block_ip,
         );
-        
-        
-        
 
+        self.move_to_next_token();
         Ok(())
     }
 
@@ -286,8 +295,34 @@ impl<'a> Parser<'a> {
         // I think it's much easir to do that with some pattern matching or something inplace. no need for extra functions here
         let op = self.prev.ty;
 
-        // put RHS expression on the stach
-        self.expression(op.into())?;
+        match op {
+            // do i need some kind of jump?
+            TokenType::And => {
+                let after_fst_expr_ip = self.chunk.count();
+                self.emit_op(OpCode::JUMP_IF_FALSE(0xFFFF));
+                self.expression(op.into())?;
+                let after_snd_expr_ip = self.chunk.count();
+                self.chunk.patch_op(
+                    OpCode::JUMP_IF_FALSE(after_snd_expr_ip as InstructAddr),
+                    after_fst_expr_ip,
+                );
+            }
+            TokenType::Or => {
+                let fst_expr = self.chunk.count();
+                self.emit_op(OpCode::JUMP_IF_FALSE(0xFFFF));
+                self.emit_op(OpCode::JUMP(0xFFFF));
+                let snd_expr = self.chunk.count();
+                self.chunk
+                    .patch_op(OpCode::JUMP_IF_FALSE(snd_expr as InstructAddr), fst_expr);
+                self.expression(op.into())?;
+                let skip_snd_expr = self.chunk.count();
+                self.chunk
+                    .patch_op(OpCode::JUMP(skip_snd_expr as InstructAddr), snd_expr);
+            }
+            _ => {
+                self.expression(op.into())?;
+            }
+        }
 
         // apply the binary op on both expressions
         match op {
@@ -310,6 +345,8 @@ impl<'a> Parser<'a> {
                 self.emit_op(OpCode::GREATER);
                 self.emit_op(OpCode::NOT)
             }
+            TokenType::And => self.emit_op(OpCode::AND),
+            TokenType::Or => self.emit_op(OpCode::OR),
             _ => {
                 dbg!(self.prev, self.cur);
                 todo!()

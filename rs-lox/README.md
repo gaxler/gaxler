@@ -2,6 +2,15 @@
 Following [Crafting Interpreters](https://craftinginterpreters.com/) in Rust. This is nice, I have to rethink how I implement everything, since original is in C and Rust provide much more convenience on one hand and challenges with the safety constraints. This is great both for understanding Rust and how to craft interpreters.
 
 At first I aim to make the thing run to spec. Later on will try to optimize some parts of it.
+## Aug 17, 2022
+* maybe there is a way to define stack consistency in Rust type system?
+* How if statements should look like?
+	* there is the if keyword, followed by a boolean result expression, this thing goes on top of the stack. Next I read the stack and move my instruction pointer to the if true block or else block
+	* if true block needs to have a jump to skip the else block
+	* true block address is the length of chunk at the moment we ended reading the expression.
+	* else block address is the chunk length at the end of writing the else block
+	* one we know it, we need to go back and define the jump address to skip the else block
+* I cause stack underflows with my AND OpCode optimization, need to rethink the process of how it works and build some debug snippets to test changes.
 ## Aug 16, 2022
 * There is no reason to try and mix &str and String when I plan eventually to refactor the way I handle identifiers. Switched everything to string cloning and now local vars work.
 ## Aug 15, 2022
