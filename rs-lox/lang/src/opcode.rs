@@ -1,6 +1,6 @@
 
 pub type ConstIdx = u8;
-pub type InstructAddr = usize;
+pub type InstructAddr = u16;
 
 #[derive(Clone, Copy, Debug)]
 #[repr(u8)]
@@ -29,6 +29,7 @@ pub enum OpCode {
     SET_GLOBAL(ConstIdx),
     SET_LOCAL(ConstIdx),
 
-    JUMP_IF_FALSE(InstructAddr)
+    JUMP_IF_FALSE(InstructAddr),
+    JUMP(InstructAddr)
 }
 

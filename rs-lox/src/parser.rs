@@ -3,7 +3,7 @@ use crate::errors::{COMPError, CompileError};
 use values::Value;
 
 use compiler::{Compiler, Local};
-use lang::{ConstIdx, OpCode};
+use lang::{ConstIdx, InstructAddr, OpCode};
 use lang::{Precedence, Scanner, Token, TokenType};
 use values::Chunk;
 
@@ -78,22 +78,7 @@ impl<'a> Parser<'a> {
                 self.emit_op(OpCode::PRINT);
             }
             TokenType::If => {
-                self.move_to_next_token();
-                self.cur_must_be(TokenType::LeftParen)?;
-                self.expression(Precedence::None)?;
-                self.cur_must_be(TokenType::RightParen)?;
-
-                // here need to read the conditioin an decide where to next
-                // the should be a true block and a false block
-                // the at the end of the true block there needs to be a jump to skip the else block
-                // so i need a way to follow the chunk size
-                // using Chunk len should do the trick
-                let true_block_ip = self.chunk.count();
-                self.emit_op(OpCode::JUMP_IF_FALSE(0xFF));
-                self.statement()?;
-                let end_of_true = self.chunk.count();
-                self.chunk
-                    .patch_op(OpCode::JUMP_IF_FALSE(end_of_true), true_block_ip);
+                self.if_else()?;
             }
 
             TokenType::LeftBrace => {
@@ -250,9 +235,45 @@ impl<'a> Parser<'a> {
         Ok(self.scanner.token_txt_str(self.prev)?.to_string())
     }
 
-    fn global_variable(&mut self, ident_: String) -> COMPError<ConstIdx> {
-        let const_idx = self.chunk.add_const(Value::String(ident_)) as ConstIdx;
-        Ok(const_idx)
+    fn if_else(&mut self) -> COMPError<()> {
+        self.move_to_next_token();
+        self.cur_must_be(TokenType::LeftParen)?;
+        self.expression(Precedence::None)?;
+        self.cur_must_be(TokenType::RightParen)?;
+
+        // here need to read the conditioin an decide where to next
+        // the should be a true block and a false block
+        // the at the end of the true block there needs to be a jump to skip the else block
+        // so i need a way to follow the chunk size
+        // using Chunk len should do the trick
+        let true_block_ip = self.chunk.count();
+        self.emit_op(OpCode::JUMP_IF_FALSE(0xFFFF));
+        self.statement()?;
+        // we need to patch something here, in case this is true
+        let mut end_of_true = self.chunk.count();
+
+        if self.cur.ty == TokenType::Else {
+            self.move_to_next_token(); 
+            self.emit_op(OpCode::JUMP(0xFFFF));
+            // else statement
+            self.statement()?;
+            self.move_to_next_token();
+            let end_of_false = self.chunk.count();
+            // go to the jump op and fix it
+            self.chunk.patch_op(OpCode::JUMP(end_of_false as InstructAddr), end_of_true);
+            // add the extra op we got from the else clause jump
+            end_of_true += 1;
+        }; 
+
+        self.chunk.patch_op(
+            OpCode::JUMP_IF_FALSE(end_of_true as InstructAddr),
+            true_block_ip,
+        );
+        
+        
+        
+
+        Ok(())
     }
 
     fn binary(&mut self) -> COMPError<()> {

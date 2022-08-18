@@ -119,7 +119,7 @@ impl VM {
                 NEGATE | NOT => {
                     let mut s = self.stack.borrow_mut();
                     exec_unary(op, &mut s).unwrap();
-                }
+                },
                 lit @ (NIL | FALSE | TRUE) => {
                     let val = Value::try_from(lit);
                     if val.is_ok() {
@@ -183,6 +183,18 @@ impl VM {
                         .borrow_mut()
                         .peek_at(slot as usize)
                         .expect("Local Slot in invalid stack location???") = val;
+                },
+                JUMP_IF_FALSE(new_ip) => {
+                    let last_val: bool  = self.pop().try_into().expect("Trying to create  a bool from non bool Value");
+                    if !last_val {
+                        self.ip = new_ip as usize; 
+                        continue;
+                    }
+
+                },
+                JUMP(new_ip) => {
+                    self.ip = new_ip as usize;
+                    continue;
                 }
             }
             self.ip += 1;
@@ -213,6 +225,9 @@ impl VM {
 
     fn read_byte(&self) -> OpCode {
         // this can't be called outside of run, wehre we make sure that chunk is not empty
+        if self.ip >= self.cur_chunk().count() {
+            self.cur_chunk().debug_ops_dump();
+        }
         let op = *self.cur_chunk().read_op(self.ip);
         if self.debug {
             disassemble_op(self.cur_chunk(), self.ip);

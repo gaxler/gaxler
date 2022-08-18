@@ -1,17 +1,4 @@
 var global = 28;
-{
-    var a = 1;
-    print global;
-    {
-        var b = 2;
-        var d = 3;
-        print "deep";
-        print b + d;
-        print global;
-    }
-    
-}
-
 print "main scope";
 print global;
-if (global > 10)
+if (global > 20) print global + " is larger than 20"; else print global + " is smaller than 20";

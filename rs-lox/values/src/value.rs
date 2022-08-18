@@ -4,7 +4,7 @@ use lang::OpCode;
 
 #[derive(Clone, Debug)]
 #[repr(u8)]
-/// Represents dynamic values in Lox. 
+/// Represents dynamic values in Lox.
 /// Every value can have several types. Also, large types like classes and string are stored on the heap as heap objects.
 /// we loose the ability to make this a copy type since we have heap object. and i want them to have the drop trait
 pub enum Value {
@@ -12,9 +12,8 @@ pub enum Value {
     Bool(bool),
     Int(i32),
     Float(f32),
-    String(String)
-    // String(HeapPtr),
-    // Obj(HeapObj)
+    String(String), // String(HeapPtr),
+                    // Obj(HeapObj)
 }
 
 impl From<f32> for Value {
@@ -40,7 +39,7 @@ impl TryFrom<Value> for String {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         if let Value::String(s) = value {
             return Ok(s);
-        } 
+        }
         Err(())
     }
 }
@@ -56,6 +55,18 @@ impl TryFrom<OpCode> for Value {
             _ => return Err(()),
         };
         Ok(res)
+    }
+}
+
+impl TryFrom<Value> for bool {
+    type Error = ();
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Bool(b) => Ok(b),
+            Value::Nil => Ok(false),
+            _ => Err(()),
+        }
     }
 }
 
@@ -106,41 +117,52 @@ macro_rules! map_expr {
     }
 }
 
+#[inline]
+fn _add_str_slices(s1: &str, s2: &str) -> Value {
+    let mut s3 = String::from_str(s1).unwrap();
+    s3.push_str(s2);
+    Value::String(s3)
+}
 
 impl Value {
     pub fn add(&self, other: Self) -> Self {
+        use Value::*;
         match (self, other) {
-            (Value::Int(v1), Value::Int(v2)) => Value::Int(v1+v2),
-            (Value::Float(v1), Value::Float(v2)) => Value::Float(v1+v2),
-            (Value::String(s1), Value::String(s2)) => {
-                let mut s3 = String::from_str(s1).unwrap();
-                s3.push_str(&s2);
-                Value::String(s3)
+            (Int(v1), Int(v2)) => Int(v1 + v2),
+            (Float(v1), Float(v2)) => Float(v1 + v2),
+            (String(v1), Float(v2)) => {
+                let fstr = v2.to_string();
+                _add_str_slices(v1.as_str(), &fstr)
             }
-            _ => Value::Nil
+            (Float(v1), String(v2)) => {
+                let fstr = v1.to_string();
+                _add_str_slices(&fstr, v2.as_str())
+            }
+            (String(s1), String(s2)) => _add_str_slices(s1, &s2),
+            _ => Nil,
         }
     }
 
     pub fn sub(&self, other: Self) -> Self {
-        map_expr!(v1 <= self, v2 <= other, v1-v2, (Int, Float))
+        map_expr!(v1 <= self, v2 <= other, v1 - v2, (Int, Float))
     }
 
     pub fn mul(&self, other: Self) -> Self {
-        map_expr!(v1 <= self, v2 <= other, v1*v2, (Int, Float))
+        map_expr!(v1 <= self, v2 <= other, v1 * v2, (Int, Float))
     }
     pub fn div(&self, other: Self) -> Self {
-        map_expr!(v1 <= self, v2 <= other, v1/v2, (Int, Float))
+        map_expr!(v1 <= self, v2 <= other, v1 / v2, (Int, Float))
     }
 
     pub fn eq(&self, other: Self) -> Self {
-        map_expr!(self => v1, other => v2, 
+        map_expr!(self => v1, other => v2,
             (*v1==v2,[Int, Float, String] -> Bool),
             (!(v1^v2), [Bool] -> Bool)
         )
     }
 
     pub fn greater(&self, other: Self) -> Self {
-        map_expr!(self => v1, other => v2, 
+        map_expr!(self => v1, other => v2,
             (*v1 > v2,[Int, Float] -> Bool),
             (*v1 && v1^v2, [Bool] -> Bool)
         )

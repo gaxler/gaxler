@@ -47,4 +47,8 @@ impl Chunk {
     pub fn patch_op(&mut self, op: OpCode, ip: usize) {
         self.ops[ip] = op;
     }
+
+    pub fn debug_ops_dump(&self) {
+        println!("{:?}", self.ops);
+    }
 }
