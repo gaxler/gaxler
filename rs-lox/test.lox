@@ -1,7 +1,3 @@
-var global = 28;
-print "main scope";
-print global;
-print false and true;
-//if (global > 20) print global + " is larger than 20"; else print global + " is smaller than 20";
-//if (5 > 7 and 7 < 3) print "no way";
-//if (true or false) print "always";
+if (true and false) print "not hi";
+print "ciao";
+if (true or false) print "hi";

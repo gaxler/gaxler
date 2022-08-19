@@ -49,6 +49,11 @@ impl Chunk {
     }
 
     pub fn debug_ops_dump(&self) {
-        println!("{:?}", self.ops);
+        println!("\t OPS: {:?}", self.ops);
+        println!("\t CONSTS: {:?}", self.consts);
+    }
+
+    pub fn get_line_num(&self, num: usize) -> usize {
+        self.line_nums[num]
     }
 }

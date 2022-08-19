@@ -70,15 +70,14 @@ impl Stack {
     }
 
     pub fn show_stack(&self) {
-        println!("Stack Values:");
-        println!("==========");
-        for (idx, v) in self.stack.iter().enumerate() {
+        print!(" [");
+        for (_, v) in self.stack.iter().enumerate() {
             match v {
                 Value::Nil => continue,
-                e => println!(" loc {} | {}", idx, *e),
+                e => print!(" {} ",  *e),
             }
         }
-        println!("==========");
+        println!("]")
     }
 }
 

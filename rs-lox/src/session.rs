@@ -7,7 +7,9 @@ pub type ChunkAddr = usize;
 
 pub struct RuntimeContext {
     vm: VM,
-    chunks: Vec<Option<Chunk>>
+    chunks: Vec<Option<Chunk>>,
+    debug: bool
+
 }
 
 impl RuntimeContext {
@@ -15,7 +17,7 @@ impl RuntimeContext {
     pub fn start(debug: bool) -> Self {
         // let heap = RefCell::new(Heap::init());
         let vm = VM::init(debug);
-        Self {vm, chunks: vec![]}
+        Self {vm, chunks: vec![], debug}
     }
 
     pub fn compile(&mut self, source: &str) -> COMPError<ChunkAddr> {
@@ -24,7 +26,11 @@ impl RuntimeContext {
 
         // let mut parser = Parser::init(&mut scanner, &mut chunk, self.heap.borrow_mut());
         let mut parser = Parser::init(&mut scanner, &mut chunk);
-        parser.parse()?;
+        let pres = parser.parse();
+        if pres.is_err() && self.debug {
+            chunk.debug_ops_dump();
+            return Err(pres.err().unwrap());
+        }
 
         self.chunks.push(Some(chunk));
         Ok(self.chunks.len() - 1)

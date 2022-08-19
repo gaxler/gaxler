@@ -7,9 +7,17 @@ use values::Value;
 use values::{Chunk, Stack, VarStore};
 
 fn stack_pop(stack: &mut Stack) -> RTError<Value> {
-    stack
+    let res = stack
         .pop()
-        .map_err(|e| RuntimeError::StackError(format!("{}", e)))
+        .map_err(|e| RuntimeError::StackError(format!("{}", e)));
+    match res {
+        Err(e) => {
+            stack.show_stack();
+            println!("Got in trouble for {}", e);
+            Err(e)
+        }
+        Ok(v) => Ok(v),
+    }
 }
 
 fn stack_push(val: Value, stack: &mut Stack) -> RTError<()> {
@@ -108,9 +116,6 @@ impl VM {
         loop {
             let op = self.read_byte();
             match op {
-                NIL => {
-                    self.push(Value::Nil);
-                }
                 RETURN => {
                     break;
                 }
@@ -121,7 +126,7 @@ impl VM {
                 NEGATE | NOT => {
                     let mut s = self.stack.borrow_mut();
                     exec_unary(op, &mut s).unwrap();
-                },
+                }
                 lit @ (NIL | FALSE | TRUE) => {
                     let val = Value::try_from(lit);
                     if val.is_ok() {
@@ -131,7 +136,11 @@ impl VM {
 
                 ADD | SUB | MUL | DIV | LESS | GREATER | EQUAL | AND | OR => {
                     let mut s = self.stack.borrow_mut();
-                    exec_binary(op, &mut s).unwrap();
+
+                    exec_binary(op, &mut s).expect(&format!(
+                        "Failed on line {}",
+                        self.cur_chunk().get_line_num(self.ip)
+                    ));
                 }
 
                 PRINT => {
@@ -185,15 +194,23 @@ impl VM {
                         .borrow_mut()
                         .peek_at(slot as usize)
                         .expect("Local Slot in invalid stack location???") = val;
-                },
+                }
                 JUMP_IF_FALSE(new_ip) => {
-                    let last_val: bool  = self.pop().try_into().expect("Trying to create  a bool from non bool Value");
+                    if self.debug {
+                        print!("\t Before JUMP_IF_FALSE: ");
+                        self.show_stack();    
+                    }
+                    
+                    let last_val: bool = self
+                        .peek()
+                        .unwrap()
+                        .try_into()
+                        .expect("Trying to create  a bool from non bool Value");
                     if !last_val {
-                        self.ip = new_ip as usize; 
+                        self.ip = new_ip as usize;
                         continue;
                     }
-
-                },
+                }
                 JUMP(new_ip) => {
                     self.ip = new_ip as usize;
                     continue;
@@ -240,14 +257,14 @@ impl VM {
     fn push(&mut self, val: Value) {
         self.stack.borrow_mut().push(val).expect("Stack push error");
         if self.debug {
-            print!("After Push: ");
+            print!("\tAfter Push: ");
             self.show_stack();
         }
     }
 
     fn pop(&mut self) -> Value {
         if self.debug {
-            print!("Before Pop: ");
+            print!("\tBefore Pop: ");
             self.show_stack();
         }
 

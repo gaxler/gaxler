@@ -127,6 +127,7 @@ impl<'a> Parser<'a> {
         use TokenType::*;
 
         // do the prefix op first
+        // TODO: remove this and work on self.cur
         self.move_to_next_token();
 
         match self.prev.ty {
@@ -151,6 +152,7 @@ impl<'a> Parser<'a> {
                 ));
             }
         }
+        
 
         // now do the infix and the res of those
         // if there is no infix operator here, we are done since the expression was handled
@@ -169,7 +171,6 @@ impl<'a> Parser<'a> {
             match self.cur.ty {
                 Minus | Plus | Slash | Star | EqualEqual | BangEqual | Greater | GreaterEqual
                 | LessEqual | Less | And | Or => {
-                    self.move_to_next_token();
                     self.binary()?
                 }
                 _ => break,
@@ -257,9 +258,9 @@ impl<'a> Parser<'a> {
         // using Chunk len should do the trick
         let true_block_ip = self.chunk.count();
         self.emit_op(OpCode::JUMP_IF_FALSE(0xFFFF));
-        let before_then = dbg!((self.prev, self.cur));
+        // let before_then = dbg!((self.prev, self.cur));
         self.statement()?;
-        
+
         // we need to patch something here, in case this is true
         let mut end_of_true = self.chunk.count();
 
@@ -280,8 +281,9 @@ impl<'a> Parser<'a> {
             OpCode::JUMP_IF_FALSE(end_of_true as InstructAddr),
             true_block_ip,
         );
-
-        self.move_to_next_token();
+        // dbg!(self.prev, self.cur);
+        // self.move_to_next_token();
+        // dbg!(self.prev, self.cur);
         Ok(())
     }
 
@@ -293,7 +295,8 @@ impl<'a> Parser<'a> {
         // the way bob does that in C is to have parse rules associated with every op token.
         // i can gothe same way as bob did maybe i should star with that and see how i can improve from there
         // I think it's much easir to do that with some pattern matching or something inplace. no need for extra functions here
-        let op = self.prev.ty;
+        let op = self.cur.ty;
+        self.move_to_next_token();
 
         match op {
             // do i need some kind of jump?
@@ -301,6 +304,7 @@ impl<'a> Parser<'a> {
                 let after_fst_expr_ip = self.chunk.count();
                 self.emit_op(OpCode::JUMP_IF_FALSE(0xFFFF));
                 self.expression(op.into())?;
+                self.emit_op(OpCode::AND);
                 let after_snd_expr_ip = self.chunk.count();
                 self.chunk.patch_op(
                     OpCode::JUMP_IF_FALSE(after_snd_expr_ip as InstructAddr),
@@ -310,11 +314,12 @@ impl<'a> Parser<'a> {
             TokenType::Or => {
                 let fst_expr = self.chunk.count();
                 self.emit_op(OpCode::JUMP_IF_FALSE(0xFFFF));
-                self.emit_op(OpCode::JUMP(0xFFFF));
                 let snd_expr = self.chunk.count();
+                self.emit_op(OpCode::JUMP(0xFFFF));
                 self.chunk
                     .patch_op(OpCode::JUMP_IF_FALSE(snd_expr as InstructAddr), fst_expr);
                 self.expression(op.into())?;
+                self.emit_op(OpCode::OR);
                 let skip_snd_expr = self.chunk.count();
                 self.chunk
                     .patch_op(OpCode::JUMP(skip_snd_expr as InstructAddr), snd_expr);
@@ -345,8 +350,9 @@ impl<'a> Parser<'a> {
                 self.emit_op(OpCode::GREATER);
                 self.emit_op(OpCode::NOT)
             }
-            TokenType::And => self.emit_op(OpCode::AND),
-            TokenType::Or => self.emit_op(OpCode::OR),
+            TokenType::And | TokenType::Or => {
+                // handled in previous match
+            },
             _ => {
                 dbg!(self.prev, self.cur);
                 todo!()
