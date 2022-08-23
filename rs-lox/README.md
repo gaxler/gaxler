@@ -2,6 +2,12 @@
 Following [Crafting Interpreters](https://craftinginterpreters.com/) in Rust. This is nice, I have to rethink how I implement everything, since original is in C and Rust provide much more convenience on one hand and challenges with the safety constraints. This is great both for understanding Rust and how to craft interpreters.
 
 At first I aim to make the thing run to spec. Later on will try to optimize some parts of it.
+## Aug 23, 2022
+* my problem with the local while implementation was that I pop on set_local. This breaks my assumption that the cleanup is done in statement end. So need to keep this invariant. No popping from the stack unless its through a POP opcode
+* `std::mem::discriminant` for enum variant comparison
+* split parser implementation to a large module, the `parser.rs` file was getting to big to handle.
+## Aug 18, 2022
+* I realized that the Parser is really cumbersome, it didn’t translate well to Rust. Maybe because the original was intended for a book where each line of code is going to be explained. Anyway, I think I can make it clearer by redoing it as a state machine.
 ## Aug 17, 2022
 * maybe there is a way to define stack consistency in Rust type system?
 * How if statements should look like?
@@ -30,7 +36,6 @@ At first I aim to make the thing run to spec. Later on will try to optimize some
 	* I store identifiers as heap strings, inside OpCode chunks. To prevent string copies, I hash the string slice (which is a pointer with length) of each identifier. 
 	* I didn’t want to mess with string interning, but looks like I don’t have a choice. For now I gonna do the string cloning but to make previous point work I need interning.
 	* I’m in a cloning hell right now
-* 
 ## Aug 12, 2022
 * **Representing Heap Values**
 	* In C you have to allocate memory for strings on the heap but in Rust, String does that for me and gets me back a pointer, length and capacity. 
