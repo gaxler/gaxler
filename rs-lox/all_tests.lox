@@ -1,0 +1,14 @@
+
+print "Calculation";
+print (23+54) / 12;
+print "str float addition";
+print "number: " + 12;
+print "Local Scope While";
+{
+    var a = 5;
+    while (a > 0) {
+        print a;
+        a = a - 1;
+    }
+
+}

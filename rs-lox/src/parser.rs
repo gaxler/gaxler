@@ -77,10 +77,9 @@ impl<'a> Parser<'a> {
                 self.cur_must_be(TokenType::Semicolon)?;
                 self.emit_op(OpCode::PRINT);
             }
-            TokenType::If => {
-                self.if_else()?;
-            }
+            TokenType::If => self.if_else()?,
 
+            TokenType::While => self.while_()?,
             TokenType::LeftBrace => {
                 self.compiler.begin_scope();
                 self.block()?;
@@ -129,7 +128,6 @@ impl<'a> Parser<'a> {
         // do the prefix op first
         // TODO: remove this and work on self.cur
         self.move_to_next_token();
-
         match self.prev.ty {
             Number => self.number()?,
             String => self.string()?,
@@ -152,7 +150,6 @@ impl<'a> Parser<'a> {
                 ));
             }
         }
-        
 
         // now do the infix and the res of those
         // if there is no infix operator here, we are done since the expression was handled
@@ -170,9 +167,7 @@ impl<'a> Parser<'a> {
 
             match self.cur.ty {
                 Minus | Plus | Slash | Star | EqualEqual | BangEqual | Greater | GreaterEqual
-                | LessEqual | Less | And | Or => {
-                    self.binary()?
-                }
+                | LessEqual | Less | And | Or => self.binary()?,
                 _ => break,
             }
         }
@@ -245,6 +240,32 @@ impl<'a> Parser<'a> {
         );
         println!("{}", a);
     }
+
+    fn while_(&mut self) -> COMPError<()> {
+        self.move_to_next_token();
+        self.cur_must_be(TokenType::LeftParen)?;
+        let loop_start = self.chunk.count();
+        self.expression(Precedence::None)?;
+        // at this point we have some result on the stack
+        self.cur_must_be(TokenType::RightParen)?;
+
+        // if rhis result is flase we jumpt to the end of the loop
+        let jmp_addr = self.chunk.count();
+        self.emit_op(OpCode::JUMP_IF_FALSE(0xFFFF));
+        // throw away the old loop condition from the stack
+        self.emit_op(OpCode::POP);
+        self.statement()?;
+        self.emit_op(OpCode::JUMP(loop_start as u16));
+
+        let end_loop = self.chunk.count();
+        self.chunk
+            .patch_op(OpCode::JUMP_IF_FALSE(end_loop as u16), jmp_addr);
+
+        // in case we jumped to the end, we need to pop whatever we had in there
+        self.emit_op(OpCode::POP);
+        Ok(())
+    }
+
     fn if_else(&mut self) -> COMPError<()> {
         self.move_to_next_token();
         self.cur_must_be(TokenType::LeftParen)?;
@@ -352,7 +373,7 @@ impl<'a> Parser<'a> {
             }
             TokenType::And | TokenType::Or => {
                 // handled in previous match
-            },
+            }
             _ => {
                 dbg!(self.prev, self.cur);
                 todo!()
@@ -406,6 +427,7 @@ impl<'a> Parser<'a> {
             self.move_to_next_token();
             Ok(())
         } else {
+            dbg!(self.prev, self.cur, ty);
             Err(CompileError::unexpected(
                 self.scanner.ascii_chars,
                 self.cur.ty,
