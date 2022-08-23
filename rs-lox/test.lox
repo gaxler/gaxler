@@ -1,3 +1,8 @@
-if (true and false) print "not hi";
-print "ciao";
-if (true or false) print "hi";
+{
+    var a = 5;
+    while (a > 0) {
+        print a;
+        a = a - 1;
+    }
+
+}

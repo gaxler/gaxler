@@ -71,9 +71,9 @@ impl Stack {
 
     pub fn show_stack(&self) {
         print!(" [");
-        for (_, v) in self.stack.iter().enumerate() {
+        for (idx, v) in self.stack.iter().enumerate() {
             match v {
-                Value::Nil => continue,
+                Value::Nil if  idx >= self.top => continue,
                 e => print!(" {} ",  *e),
             }
         }

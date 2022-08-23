@@ -55,13 +55,11 @@ fn exec_unary(op: OpCode, stack: &mut Stack) -> RTError<()> {
 
 fn exec_binary(op: OpCode, stack: &mut Stack) -> Result<(), RuntimeError> {
     use OpCode::*;
-
     let v2 = stack_pop(stack)?;
     let v1 = stack_pop(stack)?;
 
     // clone those is cheap
     let dbg_vals = (v1.clone(), v2.clone());
-
     let res = match op {
         ADD => v1.add(v2),
         SUB => v1.sub(v2),
@@ -115,6 +113,7 @@ impl VM {
 
         loop {
             let op = self.read_byte();
+            if self.debug {println!("\t {}) {:?} <- line {}", self.ip, op, self.cur_chunk().line_nums[self.ip])};
             match op {
                 RETURN => {
                     break;
@@ -188,7 +187,7 @@ impl VM {
                 }
                 SET_LOCAL(slot) => {
                     // we see equal after an identifier, we evaluate and expression (result on stack) and call the assignemnt OP
-                    let val = self.pop();
+                    let val = self.peek()?;
                     *self
                         .stack
                         .borrow_mut()
@@ -196,11 +195,7 @@ impl VM {
                         .expect("Local Slot in invalid stack location???") = val;
                 }
                 JUMP_IF_FALSE(new_ip) => {
-                    if self.debug {
-                        print!("\t Before JUMP_IF_FALSE: ");
-                        self.show_stack();    
-                    }
-                    
+
                     let last_val: bool = self
                         .peek()
                         .unwrap()
@@ -216,10 +211,9 @@ impl VM {
                     continue;
                 }
             }
+            
+            if self.debug { print!("\t"); self.show_stack()};
             self.ip += 1;
-        }
-        if self.debug {
-            println!("{}", self.stack.borrow());
         }
         // clear chunk
         Ok(())
@@ -249,26 +243,17 @@ impl VM {
         }
         let op = *self.cur_chunk().read_op(self.ip);
         if self.debug {
-            disassemble_op(self.cur_chunk(), self.ip);
+            // disassemble_op(self.cur_chunk(), self.ip);
         }
         op
     }
 
     fn push(&mut self, val: Value) {
         self.stack.borrow_mut().push(val).expect("Stack push error");
-        if self.debug {
-            print!("\tAfter Push: ");
-            self.show_stack();
-        }
     }
 
     fn pop(&mut self) -> Value {
-        if self.debug {
-            print!("\tBefore Pop: ");
-            self.show_stack();
-        }
-
-        match self.stack.borrow_mut().pop() {
+            match self.stack.borrow_mut().pop() {
             Ok(v) => v,
             Err(e) => {
                 println!(" [ Error -> @{:04}:{} ]", self.ip, e);

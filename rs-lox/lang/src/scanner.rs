@@ -43,6 +43,7 @@ pub struct Scanner<'a> {
     pub line: u32,
 }
 
+
 enum MatchState {
     SyntaxError,
     ScanNext,

@@ -104,6 +104,12 @@ impl Compiler {
         }
         false
     }
+
+    pub fn show_locals(&self) {
+        for l in self.locals.iter().enumerate().filter(|(_, l)| l.depth > 0) {
+            print!(" {}) {} ", l.0, l.1.name);    
+        }
+    }
 }
 
 impl<'a> std::fmt::Display for Compiler {
