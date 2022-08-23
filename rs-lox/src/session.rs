@@ -1,11 +1,11 @@
 use crate::{
-    errors::{COMPError, RTError},
-    parser::Parser,
+    errors::{RTError},
     vm::VM,
 };
 use lang::Scanner;
 use values::Chunk;
-
+use compiler::COMPError;
+use compiler::Parser;
 pub type ChunkAddr = usize;
 
 pub struct RuntimeContext {

@@ -1,8 +1,9 @@
 mod comptime;
-// mod parser;
+mod parser;
 
 pub use comptime::{Compiler, Local};
-// pub use parser::Parser;
+pub use parser::Parser;
+pub use parser::COMPError;
 
 #[cfg(test)]
 mod tests {
