@@ -113,7 +113,14 @@ impl VM {
 
         loop {
             let op = self.read_byte();
-            if self.debug {println!("\t {}) {:?} <- line {}", self.ip, op, self.cur_chunk().line_nums[self.ip])};
+            if self.debug {
+                println!(
+                    "\t {}) {:?} <- line {}",
+                    self.ip,
+                    op,
+                    self.cur_chunk().line_nums[self.ip]
+                )
+            };
             match op {
                 RETURN => {
                     break;
@@ -195,7 +202,6 @@ impl VM {
                         .expect("Local Slot in invalid stack location???") = val;
                 }
                 JUMP_IF_FALSE(new_ip) => {
-
                     let last_val: bool = self
                         .peek()
                         .unwrap()
@@ -211,9 +217,9 @@ impl VM {
                     continue;
                 }
             }
-            
-            if self.debug { 
-                print!("\t"); 
+
+            if self.debug {
+                print!("\t");
                 self.show_stack();
             };
             self.ip += 1;
@@ -246,7 +252,10 @@ impl VM {
             print!("\t STACK: ");
             self.show_stack();
         }
-        let op = *self.cur_chunk().read_op(self.ip).expect(&format!(" IP Out of Bounds: Failed to read Op from {} instruction pointer", self.ip));
+        let op = *self.cur_chunk().read_op(self.ip).expect(&format!(
+            " IP Out of Bounds: Failed to read Op from {} instruction pointer",
+            self.ip
+        ));
         if self.debug {
             // disassemble_op(self.cur_chunk(), self.ip);
         }
@@ -258,7 +267,7 @@ impl VM {
     }
 
     fn pop(&mut self) -> Value {
-            match self.stack.borrow_mut().pop() {
+        match self.stack.borrow_mut().pop() {
             Ok(v) => v,
             Err(e) => {
                 println!(" [ Error -> @{:04}:{} ]", self.ip, e);

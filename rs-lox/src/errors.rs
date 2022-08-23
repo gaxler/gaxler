@@ -3,11 +3,9 @@ pub type COMPError<T> = Result<T, CompileError>;
 pub type RTError<T> = Result<T, RuntimeError>;
 use thiserror::Error;
 
-
-use values::Value;
-use lang::OpCode;
 pub use lang::CompileError;
-
+use lang::OpCode;
+use values::Value;
 
 #[derive(Debug, Error)]
 pub enum RuntimeError {
@@ -18,5 +16,5 @@ pub enum RuntimeError {
     #[error("Op {0:?} not allowed on types {1:?} and {2:?}")]
     IllegalOp(OpCode, String, String),
     #[error("Unknown variable {0}")]
-    UnknownVariable(String)
+    UnknownVariable(String),
 }

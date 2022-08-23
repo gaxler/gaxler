@@ -4,14 +4,13 @@ use crate::Value;
 
 #[derive(Debug, Clone)]
 pub struct VarStore {
-    store: HashMap<String, Value>
+    store: HashMap<String, Value>,
 }
-
 
 impl VarStore {
     pub fn new() -> Self {
         let store = HashMap::new();
-        Self {store}
+        Self { store }
     }
 
     pub fn put(&mut self, ident_: String, val: Value) {

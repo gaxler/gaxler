@@ -56,15 +56,16 @@ pub struct Token {
 impl Token {
     pub fn make(token_type: TokenType, scanner: &Scanner) -> Self {
         let (start_pos, len) = match token_type {
-           TokenType::String => {
-            (scanner.start_pos+1, scanner.cur_pos-scanner.start_pos-2)   
-           } 
-           _ => (scanner.start_pos, scanner.cur_pos -scanner.start_pos)
+            TokenType::String => (
+                scanner.start_pos + 1,
+                scanner.cur_pos - scanner.start_pos - 2,
+            ),
+            _ => (scanner.start_pos, scanner.cur_pos - scanner.start_pos),
         };
-        
+
         Self {
             ty: token_type,
-            start_pos, 
+            start_pos,
             len,
             line: scanner.line,
         }
@@ -79,7 +80,6 @@ impl Token {
         }
     }
 }
-
 
 #[derive(PartialEq, PartialOrd, Debug, Clone, Copy)]
 #[repr(u8)]
@@ -114,4 +114,3 @@ impl From<TokenType> for Precedence {
         }
     }
 }
-

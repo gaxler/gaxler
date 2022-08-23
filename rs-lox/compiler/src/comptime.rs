@@ -1,4 +1,4 @@
-use std::{iter, borrow::Borrow};
+use std::{borrow::Borrow, iter};
 
 type CountTy = i16;
 
@@ -10,7 +10,10 @@ pub struct Local {
 
 impl Default for Local {
     fn default() -> Self {
-        Self { name: "".to_string(), depth: -1 }
+        Self {
+            name: "".to_string(),
+            depth: -1,
+        }
     }
 }
 
@@ -107,7 +110,7 @@ impl Compiler {
 
     pub fn show_locals(&self) {
         for l in self.locals.iter().enumerate().filter(|(_, l)| l.depth > 0) {
-            print!(" {}) {} ", l.0, l.1.name);    
+            print!(" {}) {} ", l.0, l.1.name);
         }
     }
 }

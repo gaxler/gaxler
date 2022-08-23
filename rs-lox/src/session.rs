@@ -1,5 +1,8 @@
-
-use crate::{vm::VM, parser::Parser, errors::{COMPError, RTError}};
+use crate::{
+    errors::{COMPError, RTError},
+    parser::Parser,
+    vm::VM,
+};
 use lang::Scanner;
 use values::Chunk;
 
@@ -8,16 +11,18 @@ pub type ChunkAddr = usize;
 pub struct RuntimeContext {
     vm: VM,
     chunks: Vec<Option<Chunk>>,
-    debug: bool
-
+    debug: bool,
 }
 
 impl RuntimeContext {
-
     pub fn start(debug: bool) -> Self {
         // let heap = RefCell::new(Heap::init());
         let vm = VM::init(debug);
-        Self {vm, chunks: vec![], debug}
+        Self {
+            vm,
+            chunks: vec![],
+            debug,
+        }
     }
 
     pub fn compile(&mut self, source: &str) -> COMPError<ChunkAddr> {
@@ -57,10 +62,4 @@ impl RuntimeContext {
     pub fn debug_report(&self) {
         self.vm.show_stack();
     }
-
-
-
-
-
-
 }

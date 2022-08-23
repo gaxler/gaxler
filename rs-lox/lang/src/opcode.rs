@@ -1,4 +1,3 @@
-
 pub type ConstIdx = u8;
 pub type InstructAddr = u16;
 
@@ -32,6 +31,5 @@ pub enum OpCode {
     SET_LOCAL(ConstIdx),
 
     JUMP_IF_FALSE(InstructAddr),
-    JUMP(InstructAddr)
+    JUMP(InstructAddr),
 }
-

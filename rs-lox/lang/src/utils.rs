@@ -60,11 +60,10 @@ pub fn cite_span(source: &str, st_pos: usize, en_pos: usize) -> String {
         let low = st.line;
         let high = en.line;
 
-
         if lino >= low && lino <= high {
             res.push_str(&format!(" {} | {}", lino, l));
             res.push_str("\n");
-            
+
             res.push_str("   | ");
 
             if lino == low {
@@ -106,7 +105,9 @@ mod tests {
     fn line_anno() {
         use std::fs;
 
-        let source = fs::read_to_string("/Users/gregoryaxler/Desktop/projects/gaxler/rs-lox/expr.lox").unwrap();
+        let source =
+            fs::read_to_string("/Users/gregoryaxler/Desktop/projects/gaxler/rs-lox/expr.lox")
+                .unwrap();
         let res = cite_span(&source, 32, 34);
         println!("{}", res);
     }

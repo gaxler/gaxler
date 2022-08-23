@@ -64,8 +64,8 @@ impl Stack {
 
         Some(self.stack[self.top - 1].borrow())
     }
-    
-    pub fn peek_at(&mut self, idx: usize) -> Option<&mut Value>{
+
+    pub fn peek_at(&mut self, idx: usize) -> Option<&mut Value> {
         self.stack.get_mut(idx)
     }
 
@@ -73,8 +73,8 @@ impl Stack {
         print!(" [");
         for (idx, v) in self.stack.iter().enumerate() {
             match v {
-                Value::Nil if  idx >= self.top => continue,
-                e => print!(" {} ",  *e),
+                Value::Nil if idx >= self.top => continue,
+                e => print!(" {} ", *e),
             }
         }
         println!("]")

@@ -1,13 +1,12 @@
+mod opcode;
+mod scanner;
 mod tokens;
 mod utils;
-mod scanner;
-mod opcode;
 
-pub use tokens::TokenType;
 pub use tokens::Precedence;
 pub use tokens::Token;
+pub use tokens::TokenType;
 
-pub use opcode::{OpCode, ConstIdx, InstructAddr};
+pub use opcode::{ConstIdx, InstructAddr, OpCode};
 
-pub use scanner::{Scanner, CompileError};
-
+pub use scanner::{CompileError, Scanner};

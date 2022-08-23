@@ -162,23 +162,23 @@ impl Value {
     }
 
     pub fn and(&self, other: Self) -> Self {
-        use  Value::*;
+        use Value::*;
 
         match (self, other) {
-           (Bool(p1), Bool(p2)) => Bool(*p1 && p2),
-           (Nil, Bool(_)) => Bool(false),
-           (Bool(_), Nil) => Bool(false),
-           _ => Nil
+            (Bool(p1), Bool(p2)) => Bool(*p1 && p2),
+            (Nil, Bool(_)) => Bool(false),
+            (Bool(_), Nil) => Bool(false),
+            _ => Nil,
         }
     }
     pub fn or(&self, other: Self) -> Self {
-        use  Value::*;
+        use Value::*;
 
         match (self, other) {
-           (Bool(p1), Bool(p2)) => Bool(*p1 || p2),
-           (Nil, Bool(p)) => Bool(p),
-           (Bool(p), Nil) => Bool(*p),
-           _ => Nil
+            (Bool(p1), Bool(p2)) => Bool(*p1 || p2),
+            (Nil, Bool(p)) => Bool(p),
+            (Bool(p), Nil) => Bool(*p),
+            _ => Nil,
         }
     }
     pub fn greater(&self, other: Self) -> Self {

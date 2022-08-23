@@ -1,4 +1,4 @@
-use lang::{OpCode, ConstIdx};
+use lang::{ConstIdx, OpCode};
 
 use crate::Value;
 
@@ -10,12 +10,10 @@ pub struct Chunk {
     pub line_nums: Vec<usize>,
 }
 
-
 #[inline]
 fn op_comp(a: OpCode, b: OpCode) -> bool {
     std::mem::discriminant(&a) == std::mem::discriminant(&b)
 }
-
 
 impl Chunk {
     pub fn new() -> Self {
@@ -50,7 +48,7 @@ impl Chunk {
     pub fn read_const(&self, addr: ConstIdx) -> &Value {
         &self.consts[addr as usize]
     }
-    
+
     pub fn patch_op(&mut self, op: OpCode, ip: usize) {
         if !self.ops_match(op, ip) {
             let top = self.ops[ip];
@@ -61,7 +59,9 @@ impl Chunk {
     }
 
     fn ops_match(&self, op: OpCode, ip: usize) -> bool {
-        let inner_op = *self.read_op(ip).expect("Read from wrong instruction addres");
+        let inner_op = *self
+            .read_op(ip)
+            .expect("Read from wrong instruction addres");
         op_comp(op, inner_op)
     }
 

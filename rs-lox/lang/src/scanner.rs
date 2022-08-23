@@ -1,4 +1,4 @@
-use std::{iter::Peekable, str::Chars, error};
+use std::{error, iter::Peekable, str::Chars};
 
 use crate::{utils::cite_span, Token, TokenType};
 use thiserror::Error;
@@ -18,18 +18,22 @@ pub enum CompileError {
 }
 
 impl CompileError {
-
-    fn prep_cite(source: &[u8], st_pos: usize, en_pos: usize) ->  String {
+    fn prep_cite(source: &[u8], st_pos: usize, en_pos: usize) -> String {
         let src = String::from_utf8(source.to_vec()).expect("Bad Code string");
         cite_span(&src, st_pos, en_pos)
-
     }
 
     pub fn syntax(source: &[u8], msg: &str, st_pos: usize, en_pos: usize) -> Self {
         Self::SyntaxError(msg.to_string(), Self::prep_cite(source, st_pos, en_pos))
     }
 
-    pub fn unexpected(source: &[u8], tok: TokenType, exp: TokenType, st_pos: usize,  en_pos: usize) -> Self {
+    pub fn unexpected(
+        source: &[u8],
+        tok: TokenType,
+        exp: TokenType,
+        st_pos: usize,
+        en_pos: usize,
+    ) -> Self {
         let cite = Self::prep_cite(source, st_pos, en_pos);
         Self::UnexpectedToken(exp, tok, cite)
     }
@@ -42,7 +46,6 @@ pub struct Scanner<'a> {
     pub cur_pos: usize,
     pub line: u32,
 }
-
 
 enum MatchState {
     SyntaxError,
@@ -127,7 +130,6 @@ impl<'a> Scanner<'a> {
     }
 
     pub fn token_txt_str(&self, tok: Token) -> COMPError<&'a str> {
-
         let chars = &self.ascii_chars[tok.start_pos..(tok.start_pos + tok.len)];
         std::str::from_utf8(chars).map_err(|_| CompileError::NonASCIIChar)
     }

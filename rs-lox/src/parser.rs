@@ -2,7 +2,7 @@ use crate::errors::{COMPError, CompileError};
 
 use values::Value;
 
-use compiler::{Compiler, Local};
+use compiler::Compiler;
 use lang::{ConstIdx, InstructAddr, OpCode};
 use lang::{Precedence, Scanner, Token, TokenType};
 use values::Chunk;
@@ -25,35 +25,6 @@ impl<'a> Parser<'a> {
             TokenType::Var => self.var_declaration()?,
             _ => self.statement()?,
         }
-        Ok(())
-    }
-
-    fn var_declaration(&mut self) -> COMPError<()> {
-        let ident_ = self.get_ident()?;
-
-        // let var_name_const_idx = self.global_variable()?;
-
-        if TokenType::Equal == self.cur.ty {
-            self.move_to_next_token();
-            // if we have an expresion that initializes the var, calculate it and put on stack
-            self.expression(Precedence::None)?;
-        } else {
-            // do nothing, we just made room on out var table for this one and push NIL inside
-            self.emit_op(OpCode::NIL);
-        }
-
-        if self.compiler.local_scope() {
-            self.compiler
-                .local_exists(&ident_)
-                .expect("TODO: proper handling of double def of local variable ");
-            self.compiler.add_local(ident_);
-            // at this point the variable is already on the stack and is going to be used in the scope
-            // it was deined in (or deeper scope)
-        } else {
-            let const_idx = self.chunk.add_const(Value::String(ident_.to_string())) as ConstIdx;
-            self.emit_op(OpCode::DEFINE_GLOBAL(const_idx));
-        }
-        self.cur_must_be(TokenType::Semicolon)?;
         Ok(())
     }
 
@@ -118,8 +89,8 @@ impl<'a> Parser<'a> {
             Minus | Bang => self.unary()?,
 
             Ident => self.identifier()?,
-            _ => self.syntax_err("Bad Expression")?,            
-        } 
+            _ => self.syntax_err("Bad Expression")?,
+        }
 
         // now do the infix and the res of those
         // if there is no infix operator here, we are done since the expression was handled
@@ -144,19 +115,33 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn move_to_next_token(&mut self) {
-        match self.scanner.scan_token() {
-            Ok(tok) => {
-                self.prev = self.cur;
-                self.cur = tok;
-            }
-            Err(e) => {
-                dbg!(e);
+    fn var_declaration(&mut self) -> COMPError<()> {
+        let ident_ = self.get_ident()?;
 
-                self.had_error = true;
-                self.panic_mode = true;
-            }
+        // let var_name_const_idx = self.global_variable()?;
+
+        if TokenType::Equal == self.cur.ty {
+            self.move_to_next_token();
+            // if we have an expresion that initializes the var, calculate it and put on stack
+            self.expression(Precedence::None)?;
+        } else {
+            // do nothing, we just made room on out var table for this one and push NIL inside
+            self.emit_op(OpCode::NIL);
         }
+
+        if self.compiler.local_scope() {
+            self.compiler
+                .local_exists(&ident_)
+                .expect("TODO: proper handling of double def of local variable ");
+            self.compiler.add_local(ident_);
+            // at this point the variable is already on the stack and is going to be used in the scope
+            // it was deined in (or deeper scope)
+        } else {
+            let const_idx = self.chunk.add_const(Value::String(ident_.to_string())) as ConstIdx;
+            self.emit_op(OpCode::DEFINE_GLOBAL(const_idx));
+        }
+        self.cur_must_be(TokenType::Semicolon)?;
+        Ok(())
     }
 
     fn identifier(&mut self) -> COMPError<()> {
@@ -251,7 +236,7 @@ impl<'a> Parser<'a> {
         }
 
         // if there is no increase clause this thing will be the same as loop body
-        let mut inc_clause  = before_cond;
+        let mut inc_clause = before_cond;
 
         // increment clause. this one is tricky.
         // single pass parser.
@@ -275,7 +260,8 @@ impl<'a> Parser<'a> {
         self.statement()?;
         self.emit_op(OpCode::JUMP(inc_clause as u16));
         let loop_end = self.chunk.count();
-        self.chunk.patch_multip_op(OpCode::JUMP_IF_FALSE(loop_end as u16), &to_loop_end);
+        self.chunk
+            .patch_multip_op(OpCode::JUMP_IF_FALSE(loop_end as u16), &to_loop_end);
         self.emit_op(OpCode::POP);
         self.clean_locals();
         self.compiler.end_scope();
@@ -343,9 +329,6 @@ impl<'a> Parser<'a> {
             OpCode::JUMP_IF_FALSE(end_of_true as InstructAddr),
             true_block_ip,
         );
-        // dbg!(self.prev, self.cur);
-        // self.move_to_next_token();
-        // dbg!(self.prev, self.cur);
         Ok(())
     }
 
@@ -461,6 +444,21 @@ impl<'a> Parser<'a> {
         }
         self.emit_op(OpCode::CONSTANT(const_idx as u8));
         Ok(())
+    }
+
+    fn move_to_next_token(&mut self) {
+        match self.scanner.scan_token() {
+            Ok(tok) => {
+                self.prev = self.cur;
+                self.cur = tok;
+            }
+            Err(e) => {
+                dbg!(e);
+
+                self.had_error = true;
+                self.panic_mode = true;
+            }
+        }
     }
 
     fn cur_must_be(&mut self, ty: TokenType) -> COMPError<()> {

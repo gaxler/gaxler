@@ -1,13 +1,13 @@
-mod value;
 mod chunk;
-mod var_store;
 mod stack;
+mod value;
+mod var_store;
 
 pub use value::Value;
 
 pub use chunk::Chunk;
-pub use var_store::VarStore;
 pub use stack::Stack;
+pub use var_store::VarStore;
 
 #[cfg(test)]
 mod tests {
