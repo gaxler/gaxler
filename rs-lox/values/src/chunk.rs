@@ -10,6 +10,13 @@ pub struct Chunk {
     pub line_nums: Vec<usize>,
 }
 
+
+#[inline]
+fn op_comp(a: OpCode, b: OpCode) -> bool {
+    std::mem::discriminant(&a) == std::mem::discriminant(&b)
+}
+
+
 impl Chunk {
     pub fn new() -> Self {
         Self {
@@ -36,8 +43,8 @@ impl Chunk {
         self.consts.len() - 1
     }
 
-    pub fn read_op(&self, ip: usize) -> &OpCode {
-        &self.ops[ip]
+    pub fn read_op(&self, ip: usize) -> Option<&OpCode> {
+        self.ops.get(ip)
     }
 
     pub fn read_const(&self, addr: ConstIdx) -> &Value {
@@ -45,7 +52,23 @@ impl Chunk {
     }
     
     pub fn patch_op(&mut self, op: OpCode, ip: usize) {
+        if !self.ops_match(op, ip) {
+            let top = self.ops[ip];
+            let msg = format!("Trying to patch unmatchin ops {:?}, {:?}", op, top);
+            panic!("{}", &msg);
+        }
         self.ops[ip] = op;
+    }
+
+    fn ops_match(&self, op: OpCode, ip: usize) -> bool {
+        let inner_op = *self.read_op(ip).expect("Read from wrong instruction addres");
+        op_comp(op, inner_op)
+    }
+
+    pub fn patch_multip_op(&mut self, op: OpCode, ips: &[usize]) {
+        for ip in ips {
+            self.patch_op(op, *ip)
+        }
     }
 
     pub fn debug_ops_dump(&self) {

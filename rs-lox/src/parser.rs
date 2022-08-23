@@ -20,82 +20,69 @@ pub struct Parser<'a> {
 impl<'a> Parser<'a> {
     // pub fn init(scanner: &'a mut Scanner<'a>, chunk: &'a mut Chunk, heap:RefMut<'a, Heap>) -> Self {
 
-    pub fn parse(&mut self) -> COMPError<()> {
-        // we got a scanner and a chunk, now it's time to start writing
-        self.move_to_next_token(); // get the first token for now ignore errors
-                                   //for now we only want to cath an expression
-        while self.cur.ty != TokenType::EoF {
-            self.declaration()?;
-            // self.expression(Precedence::Assignme"nt).unwrap();
-        }
-
-        self.cur_must_be(TokenType::EoF)?; // finished reading the whole scanner
-        self.emit_op(OpCode::RETURN);
-        Ok(())
-    }
-
     fn declaration(&mut self) -> COMPError<()> {
         match self.cur.ty {
-            TokenType::Var => {
-                let ident_ = self.get_ident()?;
-
-                // let var_name_const_idx = self.global_variable()?;
-
-                if TokenType::Equal == self.cur.ty {
-                    self.move_to_next_token();
-                    // if we have an expresion that initializes the var, calculate it and put on stack
-                    self.expression(Precedence::None)?;
-                } else {
-                    // do nothing, we just made room on out var table for this one and push NIL inside
-                    self.emit_op(OpCode::NIL);
-                }
-
-                if self.compiler.local_scope() {
-                    self.compiler
-                        .local_exists(&ident_)
-                        .expect("TODO: proper handling of double def of local variable ");
-                    self.compiler.add_local(ident_);
-                    // at this point the variable is already on the stack and is going to be used in the scope
-                    // it was deined in (or deeper scope)
-                } else {
-                    let const_idx =
-                        self.chunk.add_const(Value::String(ident_.to_string())) as ConstIdx;
-                    self.emit_op(OpCode::DEFINE_GLOBAL(const_idx));
-                }
-                self.cur_must_be(TokenType::Semicolon)?;
-            }
+            TokenType::Var => self.var_declaration()?,
             _ => self.statement()?,
         }
         Ok(())
     }
 
+    fn var_declaration(&mut self) -> COMPError<()> {
+        let ident_ = self.get_ident()?;
+
+        // let var_name_const_idx = self.global_variable()?;
+
+        if TokenType::Equal == self.cur.ty {
+            self.move_to_next_token();
+            // if we have an expresion that initializes the var, calculate it and put on stack
+            self.expression(Precedence::None)?;
+        } else {
+            // do nothing, we just made room on out var table for this one and push NIL inside
+            self.emit_op(OpCode::NIL);
+        }
+
+        if self.compiler.local_scope() {
+            self.compiler
+                .local_exists(&ident_)
+                .expect("TODO: proper handling of double def of local variable ");
+            self.compiler.add_local(ident_);
+            // at this point the variable is already on the stack and is going to be used in the scope
+            // it was deined in (or deeper scope)
+        } else {
+            let const_idx = self.chunk.add_const(Value::String(ident_.to_string())) as ConstIdx;
+            self.emit_op(OpCode::DEFINE_GLOBAL(const_idx));
+        }
+        self.cur_must_be(TokenType::Semicolon)?;
+        Ok(())
+    }
+
     fn statement(&mut self) -> COMPError<()> {
         match self.cur.ty {
-            TokenType::Print => {
-                self.move_to_next_token();
-                self.expression(Precedence::None)?;
-                self.cur_must_be(TokenType::Semicolon)?;
-                self.emit_op(OpCode::PRINT);
-            }
+            TokenType::Print => self.print()?,
             TokenType::If => self.if_else()?,
-
             TokenType::While => self.while_()?,
-            TokenType::LeftBrace => {
-                self.compiler.begin_scope();
-                self.block()?;
-
-                while self.compiler.should_pop_local() {
-                    self.emit_op(OpCode::POP);
-                }
-                self.compiler.end_scope();
-            }
-            // Expression statement
-            _ => {
-                self.expression(Precedence::None)?;
-                self.cur_must_be(TokenType::Semicolon)?;
-                self.emit_op(OpCode::POP);
-            }
+            TokenType::For => self.for_()?,
+            TokenType::LeftBrace => self.scope()?,
+            _ => self.expression_statement()?,
         }
+        Ok(())
+    }
+
+    fn expression_statement(&mut self) -> COMPError<()> {
+        self.expression(Precedence::None)?;
+        self.cur_must_be(TokenType::Semicolon)?;
+        self.emit_op(OpCode::POP);
+        Ok(())
+    }
+
+    fn scope(&mut self) -> COMPError<()> {
+        self.compiler.begin_scope();
+        self.block()?;
+
+        self.clean_locals();
+        self.compiler.end_scope();
+
         Ok(())
     }
 
@@ -104,15 +91,7 @@ impl<'a> Parser<'a> {
         loop {
             match self.cur.ty {
                 TokenType::RightBrace => break,
-                TokenType::EoF => {
-                    return Err(CompileError::syntax(
-                        self.scanner.ascii_chars,
-                        "EoF without block close",
-                        self.scanner.start_pos,
-                        self.scanner.cur_pos,
-                    ));
-                }
-
+                TokenType::EoF => self.syntax_err("EoF without block close")?,
                 _ => {
                     self.declaration()?;
                 }
@@ -139,17 +118,8 @@ impl<'a> Parser<'a> {
             Minus | Bang => self.unary()?,
 
             Ident => self.identifier()?,
-
-            _ => {
-                // Expression that doesn't start with a prefix op or a literal is poorly formed
-                return Err(CompileError::syntax(
-                    self.scanner.ascii_chars,
-                    "Bad expression",
-                    self.scanner.start_pos,
-                    self.scanner.cur_pos,
-                ));
-            }
-        }
+            _ => self.syntax_err("Bad Expression")?,            
+        } 
 
         // now do the infix and the res of those
         // if there is no infix operator here, we are done since the expression was handled
@@ -239,6 +209,77 @@ impl<'a> Parser<'a> {
             tok.start_pos + tok.len,
         );
         println!("{}", a);
+    }
+
+    fn print(&mut self) -> COMPError<()> {
+        self.move_to_next_token();
+        self.expression(Precedence::None)?;
+        self.cur_must_be(TokenType::Semicolon)?;
+        self.emit_op(OpCode::PRINT);
+        Ok(())
+    }
+
+    fn for_(&mut self) -> COMPError<()> {
+        self.move_to_next_token();
+        self.compiler.begin_scope();
+        self.cur_must_be(TokenType::LeftParen)?;
+
+        let mut to_loop_body: Vec<usize> = vec![];
+        let mut to_loop_end: Vec<usize> = vec![];
+
+        match self.cur.ty {
+            // this thing means there is no initializer
+            TokenType::Semicolon => {}
+            TokenType::Var => self.var_declaration()?,
+            // assignment to seomthing declared
+            _ => self.expression_statement()?,
+        }
+        let before_cond = self.chunk.count();
+
+        if TokenType::Semicolon != self.cur.ty {
+            self.expression(Precedence::None)?;
+            self.cur_must_be(TokenType::Semicolon)?;
+
+            // jump to the end of the loop
+            to_loop_end.push(self.chunk.count());
+            self.emit_op(OpCode::JUMP_IF_FALSE(0xFF));
+            // no false, we get rid of the conditoinal (if we jump we will get rid of it in loop closure)
+            self.emit_op(OpCode::POP);
+
+            to_loop_body.push(self.chunk.count());
+            self.emit_op(OpCode::JUMP(0xFF));
+        }
+
+        // if there is no increase clause this thing will be the same as loop body
+        let mut inc_clause  = before_cond;
+
+        // increment clause. this one is tricky.
+        // single pass parser.
+        // we define it here, but it must run after the body is executed
+        if self.cur.ty != TokenType::RightParen {
+            to_loop_body.push(self.chunk.count());
+            self.emit_op(OpCode::JUMP(0xFF));
+
+            inc_clause = self.chunk.count();
+
+            self.expression(Precedence::Assignment)?;
+            self.emit_op(OpCode::POP);
+            // this happens only if we have increase clause
+            self.emit_op(OpCode::JUMP(before_cond as u16));
+        }
+
+        self.cur_must_be(TokenType::RightParen)?;
+        let loop_body = self.chunk.count();
+        self.chunk
+            .patch_multip_op(OpCode::JUMP(loop_body as u16), &to_loop_body);
+        self.statement()?;
+        self.emit_op(OpCode::JUMP(inc_clause as u16));
+        let loop_end = self.chunk.count();
+        self.chunk.patch_multip_op(OpCode::JUMP_IF_FALSE(loop_end as u16), &to_loop_end);
+        self.emit_op(OpCode::POP);
+        self.clean_locals();
+        self.compiler.end_scope();
+        Ok(())
     }
 
     fn while_(&mut self) -> COMPError<()> {
@@ -427,7 +468,6 @@ impl<'a> Parser<'a> {
             self.move_to_next_token();
             Ok(())
         } else {
-            dbg!(self.prev, self.cur, ty);
             Err(CompileError::unexpected(
                 self.scanner.ascii_chars,
                 self.cur.ty,
@@ -455,5 +495,34 @@ impl<'a> Parser<'a> {
             compiler,
         };
         parser
+    }
+
+    pub fn parse(&mut self) -> COMPError<()> {
+        // we got a scanner and a chunk, now it's time to start writing
+        self.move_to_next_token(); // get the first token for now ignore errors
+                                   //for now we only want to cath an expression
+        while self.cur.ty != TokenType::EoF {
+            self.declaration()?;
+            // self.expression(Precedence::Assignme"nt).unwrap();
+        }
+
+        self.cur_must_be(TokenType::EoF)?; // finished reading the whole scanner
+        self.emit_op(OpCode::RETURN);
+        Ok(())
+    }
+
+    fn syntax_err(&self, msg: &str) -> COMPError<()> {
+        Err(CompileError::syntax(
+            self.scanner.ascii_chars,
+            msg,
+            self.cur.start_pos,
+            self.cur.start_pos + self.cur.len,
+        ))
+    }
+
+    fn clean_locals(&mut self) {
+        while self.compiler.should_pop_local() {
+            self.emit_op(OpCode::POP);
+        }
     }
 }

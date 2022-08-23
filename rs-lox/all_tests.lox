@@ -12,3 +12,15 @@ print "Local Scope While";
     }
 
 }
+
+print "Global for loop";
+for (var a = 0; a < 40; a = a+1 ) {
+    print a;
+}
+
+print "Local for loop";
+{
+    for (var b = 0; b < 5; b = b+1 ) {
+        print b;
+    }
+}

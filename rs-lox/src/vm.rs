@@ -212,7 +212,10 @@ impl VM {
                 }
             }
             
-            if self.debug { print!("\t"); self.show_stack()};
+            if self.debug { 
+                print!("\t"); 
+                self.show_stack();
+            };
             self.ip += 1;
         }
         // clear chunk
@@ -240,8 +243,10 @@ impl VM {
         // this can't be called outside of run, wehre we make sure that chunk is not empty
         if self.ip >= self.cur_chunk().count() {
             self.cur_chunk().debug_ops_dump();
+            print!("\t STACK: ");
+            self.show_stack();
         }
-        let op = *self.cur_chunk().read_op(self.ip);
+        let op = *self.cur_chunk().read_op(self.ip).expect(&format!(" IP Out of Bounds: Failed to read Op from {} instruction pointer", self.ip));
         if self.debug {
             // disassemble_op(self.cur_chunk(), self.ip);
         }
@@ -301,7 +306,7 @@ impl VM {
 pub fn disassemble_op(chunk: &Chunk, offset: usize) {
     use OpCode::*;
     print!("{:04} ", offset);
-    let op = chunk.read_op(offset);
+    let op = chunk.read_op(offset).unwrap();
     let line = &chunk.line_nums[offset];
     if offset > 0 && line == &chunk.line_nums[offset - 1] {
         print!("  |   ");
