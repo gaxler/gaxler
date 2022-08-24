@@ -1,8 +1,7 @@
 mod errors;
-mod parser;
 
 mod session;
-mod vm;
+mod runtime;
 
 use session::RuntimeContext;
 use std::env;
