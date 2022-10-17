@@ -10,5 +10,12 @@ Cargo.lock
 **/*.rs.bk
 rs-lox/target/*
 systems/target/*
+
 arithmetic-compression/target/*
 rs-lox/lang/target/*
+
+books/mental_models/*
+books/papers/_book
+
+arithmetic-compression/*
+systems/*

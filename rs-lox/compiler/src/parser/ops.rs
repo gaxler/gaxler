@@ -1,6 +1,5 @@
 use super::*;
 impl<'a> Parser<'a> {
-
     pub(super) fn unary(&mut self) -> COMPError<()> {
         let op = self.prev.ty;
 

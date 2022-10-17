@@ -1,0 +1,28 @@
+project:
+  type: book
+
+book:
+  title: "Overview of papers"
+  # author: "Jane Doe"
+  # date: "10/16/2022"
+  chapters:
+    - index.qmd
+    - part: "Architectures"
+      chapters:
+        - arch/vit.qmd
+    - part: SSL
+      chapters:
+        - ssl/vito.qmd
+    - references.qmd
+
+bibliography: references.bib
+number-depth: 0
+
+format:
+  html:
+    theme: cosmo
+  pdf:
+    documentclass: scrreprt
+
+
+

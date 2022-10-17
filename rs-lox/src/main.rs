@@ -1,7 +1,7 @@
 mod errors;
 
-mod session;
 mod runtime;
+mod session;
 
 use session::RuntimeContext;
 use std::env;
