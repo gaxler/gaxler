@@ -8,7 +8,7 @@ I also love systems programming especially the parts that relate to deep learnin
 
 - [DL Paper Summaries](https://gaxler.github.io/papers/) - A collection of paper summaries in a serachable form.
 
-## Coding Projects :olive: 
+## Coding :olive: 
 
 - [motion transfer](https://github.com/gaxler/transmotion) - Translate motion from videos to still images
 
