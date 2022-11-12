@@ -21,7 +21,7 @@ Perviously I worked for an [MLOps startup](https://github.com/allegroai/clearml)
 
 Before that I worked with the same people on optimizing video object detection inference for edge devices. Developing neural nets that can adjust their computation amount on the fly. The computation adjustment was done based on a gating mechanism that identified which parts of the frame can be reused. The other end of the system was adjusting the convolution computations to skip the reusable parts.
 
-In Gard school I worked with Prof. [Lior Wolf](http://www.cs.tau.ac.il/~wolf/) on adapting object detection neural net architectures to be more efficient on [detecting text in historical documents](https://sites.google.com/view/tdsas/home)
+In Grad school I worked with Prof. [Lior Wolf](http://www.cs.tau.ac.il/~wolf/) on adapting object detection neural net architectures to be more efficient on [detecting text in historical documents](https://sites.google.com/view/tdsas/home)
 
 
 
